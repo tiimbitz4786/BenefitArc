@@ -10,21 +10,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, isApproved } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
     setLoading(true);
+    setPendingApproval(false);
 
     if (isSignUp) {
       const { data, error } = await signUp(email, password);
       if (error) {
         setError(error.message);
       } else {
-        setMessage('Account created! You can now sign in.');
+        setMessage('Account created! Your request is pending admin approval. You will be notified when approved.');
         setIsSignUp(false);
         setPassword('');
       }
@@ -33,6 +35,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       }
+      // Note: approval check happens in the parent component
     }
 
     setLoading(false);
@@ -59,15 +62,15 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <svg width={60} height={60} viewBox="0 0 100 100" fill="none" style={{ margin: '0 auto 16px' }}>
+          <svg width={60} height={60} viewBox="0 0 100 100" fill="none" style={{ margin: '0 auto 16px', display: 'block' }}>
             <defs>
-              <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="arcGradientLogin" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#3b82f6" />
                 <stop offset="50%" stopColor="#6366f1" />
                 <stop offset="100%" stopColor="#10b981" />
               </linearGradient>
             </defs>
-            <path d="M20 70 Q50 10 80 70" stroke="url(#arcGradient)" strokeWidth="8" strokeLinecap="round" fill="none" />
+            <path d="M20 70 Q50 10 80 70" stroke="url(#arcGradientLogin)" strokeWidth="8" strokeLinecap="round" fill="none" />
             <circle cx="20" cy="70" r="6" fill="#3b82f6" />
             <circle cx="80" cy="70" r="6" fill="#10b981" />
             <circle cx="50" cy="25" r="8" fill="#6366f1" />
@@ -89,7 +92,7 @@ export default function LoginPage() {
           marginBottom: '24px',
         }}>
           <button
-            onClick={() => setIsSignUp(false)}
+            onClick={() => { setIsSignUp(false); setError(''); setMessage(''); }}
             style={{
               flex: 1,
               padding: '10px',
@@ -105,7 +108,7 @@ export default function LoginPage() {
             Sign In
           </button>
           <button
-            onClick={() => setIsSignUp(true)}
+            onClick={() => { setIsSignUp(true); setError(''); setMessage(''); }}
             style={{
               flex: 1,
               padding: '10px',
@@ -118,9 +121,24 @@ export default function LoginPage() {
               cursor: 'pointer',
             }}
           >
-            Sign Up
+            Request Access
           </button>
         </div>
+
+        {/* Sign Up Info */}
+        {isSignUp && (
+          <div style={{
+            padding: '12px',
+            borderRadius: '8px',
+            background: 'rgba(99, 102, 241, 0.1)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            marginBottom: '20px',
+            fontSize: '12px',
+            color: '#a5b4fc',
+          }}>
+            <strong>Note:</strong> New accounts require admin approval before you can access the tools.
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
@@ -224,7 +242,7 @@ export default function LoginPage() {
               boxShadow: loading ? 'none' : '0 0 30px rgba(99, 102, 241, 0.4)',
             }}
           >
-            {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+            {loading ? 'Please wait...' : (isSignUp ? 'Request Access' : 'Sign In')}
           </button>
         </form>
 
