@@ -103,17 +103,14 @@ export default function Home() {
     );
   }
 
-  // Not logged in - show login page
   if (!user) {
     return <LoginPage />;
   }
 
-  // Logged in but not approved - show pending page
   if (!isApproved) {
     return <PendingApproval />;
   }
 
-  // Approved - show main app
   return (
     <div style={{
       minHeight: '100vh',
@@ -136,7 +133,6 @@ export default function Home() {
         background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)', pointerEvents: 'none',
       }} />
       
-      {/* Top Bar */}
       <div style={{ 
         position: 'absolute', top: '20px', right: '20px', zIndex: 10,
         display: 'flex', alignItems: 'center', gap: '12px',
