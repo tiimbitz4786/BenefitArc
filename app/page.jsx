@@ -1,12 +1,7 @@
 'use client';
-import React from 'react';
 
-// ============================================
-// BENEFITARC TOOLS HUB
-// Central navigation for all BenefitArc tools
-// ============================================
+import Link from 'next/link';
 
-// BenefitArc Logo Component
 const BenefitArcLogo = ({ size = 60 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
     <defs>
@@ -29,135 +24,118 @@ const BenefitArcLogo = ({ size = 60 }) => (
   </svg>
 );
 
-// Tool Card Component
-const ToolCard = ({ title, description, icon, status, onClick, gradient, features }) => (
-  <div
-    onClick={onClick}
-    style={{
-      background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(20, 20, 35, 0.9) 100%)',
-      borderRadius: '20px',
-      border: '1px solid rgba(99, 102, 241, 0.2)',
-      padding: '28px',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      position: 'relative',
-      overflow: 'hidden',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-4px)';
-      e.currentTarget.style.boxShadow = '0 20px 40px rgba(99, 102, 241, 0.2)';
-      e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.4)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.boxShadow = 'none';
-      e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
-    }}
-  >
-    {/* Gradient accent */}
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: '4px',
-      background: gradient,
-    }} />
-    
-    {/* Icon */}
-    <div style={{
-      width: '56px',
-      height: '56px',
-      borderRadius: '14px',
-      background: gradient,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '28px',
-      marginBottom: '20px',
-      boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)',
-    }}>
-      {icon}
-    </div>
-    
-    {/* Status Badge */}
-    {status && (
+const ToolCard = ({ title, description, icon, status, href, gradient, features }) => (
+  <Link href={href} style={{ textDecoration: 'none' }}>
+    <div
+      style={{
+        background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(20, 20, 35, 0.9) 100%)',
+        borderRadius: '20px',
+        border: '1px solid rgba(99, 102, 241, 0.2)',
+        padding: '28px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        position: 'relative',
+        overflow: 'hidden',
+        height: '100%',
+      }}
+    >
       <div style={{
         position: 'absolute',
-        top: '20px',
-        right: '20px',
-        padding: '4px 10px',
-        borderRadius: '20px',
-        background: status === 'Live' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-        border: `1px solid ${status === 'Live' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
-        color: status === 'Live' ? '#10b981' : '#f59e0b',
-        fontSize: '10px',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '4px',
+        background: gradient,
+      }} />
+      
+      <div style={{
+        width: '56px',
+        height: '56px',
+        borderRadius: '14px',
+        background: gradient,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '28px',
+        marginBottom: '20px',
+        boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)',
       }}>
-        {status}
+        {icon}
       </div>
-    )}
-    
-    {/* Title */}
-    <h3 style={{
-      fontSize: '20px',
-      fontWeight: '700',
-      color: '#f8fafc',
-      marginBottom: '8px',
-    }}>
-      {title}
-    </h3>
-    
-    {/* Description */}
-    <p style={{
-      fontSize: '13px',
-      color: '#94a3b8',
-      lineHeight: '1.6',
-      marginBottom: '16px',
-    }}>
-      {description}
-    </p>
-    
-    {/* Features */}
-    {features && (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-        {features.map((feature, idx) => (
-          <span
-            key={idx}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '6px',
-              background: 'rgba(99, 102, 241, 0.1)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              color: '#a5b4fc',
-              fontSize: '10px',
-              fontWeight: '500',
-            }}
-          >
-            {feature}
-          </span>
-        ))}
+      
+      {status && (
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          padding: '4px 10px',
+          borderRadius: '20px',
+          background: status === 'Live' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+          border: `1px solid ${status === 'Live' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
+          color: status === 'Live' ? '#10b981' : '#f59e0b',
+          fontSize: '10px',
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}>
+          {status}
+        </div>
+      )}
+      
+      <h3 style={{
+        fontSize: '20px',
+        fontWeight: '700',
+        color: '#f8fafc',
+        marginBottom: '8px',
+      }}>
+        {title}
+      </h3>
+      
+      <p style={{
+        fontSize: '13px',
+        color: '#94a3b8',
+        lineHeight: '1.6',
+        marginBottom: '16px',
+      }}>
+        {description}
+      </p>
+      
+      {features && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+          {features.map((feature, idx) => (
+            <span
+              key={idx}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                color: '#a5b4fc',
+                fontSize: '10px',
+                fontWeight: '500',
+              }}
+            >
+              {feature}
+            </span>
+          ))}
+        </div>
+      )}
+      
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        color: '#6366f1',
+        fontSize: '13px',
+        fontWeight: '600',
+      }}>
+        Launch Tool
+        <span style={{ fontSize: '16px' }}>→</span>
       </div>
-    )}
-    
-    {/* Launch Arrow */}
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      color: '#6366f1',
-      fontSize: '13px',
-      fontWeight: '600',
-    }}>
-      Launch Tool
-      <span style={{ fontSize: '16px' }}>→</span>
     </div>
-  </div>
+  </Link>
 );
 
-// Coming Soon Card
 const ComingSoonCard = ({ title, description }) => (
   <div style={{
     background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.6) 0%, rgba(20, 20, 35, 0.5) 100%)',
@@ -200,13 +178,7 @@ const ComingSoonCard = ({ title, description }) => (
   </div>
 );
 
-export default function BenefitArcHub() {
-  // In a real deployment, these would be actual routes or URLs
-  const handleToolLaunch = (tool) => {
-    // For now, show an alert - in production, this would navigate to the tool
-    alert(`Launching ${tool}...\n\nIn production, this will navigate to the ${tool} page.`);
-  };
-
+export default function Home() {
   return (
     <div style={{
       minHeight: '100vh',
@@ -216,7 +188,6 @@ export default function BenefitArcHub() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Background Grid */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -228,7 +199,6 @@ export default function BenefitArcHub() {
         pointerEvents: 'none',
       }} />
       
-      {/* Gradient Orbs */}
       <div style={{
         position: 'absolute',
         top: '-20%',
@@ -248,10 +218,8 @@ export default function BenefitArcHub() {
         pointerEvents: 'none',
       }} />
       
-      {/* Content */}
       <div style={{ position: 'relative', zIndex: 1, padding: '40px 24px', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: '60px' }}>
           <div style={{ 
             display: 'flex', 
@@ -270,9 +238,6 @@ export default function BenefitArcHub() {
                 color: '#f8fafc', 
                 margin: 0,
                 letterSpacing: '-1px',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
               }}>
                 BenefitArc
               </h1>
@@ -300,7 +265,6 @@ export default function BenefitArcHub() {
           </p>
         </header>
         
-        {/* Tools Grid */}
         <section>
           <h2 style={{ 
             fontSize: '14px', 
@@ -319,7 +283,6 @@ export default function BenefitArcHub() {
             gap: '24px',
             marginBottom: '40px',
           }}>
-            {/* T12 P&L Analysis */}
             <ToolCard
               title="T12 P&L Analysis"
               description="Analyze your trailing 12-month Profit & Loss report. Automatically categorizes SS-specific expenses into Marketing, Labor, and Other buckets for benchmarking."
@@ -327,10 +290,9 @@ export default function BenefitArcHub() {
               status="Live"
               gradient="linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)"
               features={['QuickBooks Import', 'Auto-Categorization', 'Benchmark Comparison', 'Local Processing']}
-              onClick={() => handleToolLaunch('T12 P&L Analysis')}
+              href="/t12-analysis"
             />
             
-            {/* Steady State Projection */}
             <ToolCard
               title="Steady State Projection"
               description="Model your practice's steady-state economics. Calculate expected revenue, case volume, and profitability at equilibrium based on your intake and case metrics."
@@ -338,11 +300,10 @@ export default function BenefitArcHub() {
               status="Live"
               gradient="linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)"
               features={['Revenue Modeling', '3-Tier Fee Analysis', 'Break-Even Analysis', 'What-If Scenarios']}
-              onClick={() => handleToolLaunch('Steady State Projection')}
+              href="/steady-state"
             />
           </div>
           
-          {/* Coming Soon Section */}
           <h2 style={{ 
             fontSize: '14px', 
             fontWeight: '600', 
@@ -375,7 +336,6 @@ export default function BenefitArcHub() {
           </div>
         </section>
         
-        {/* Footer */}
         <footer style={{ 
           marginTop: '80px', 
           paddingTop: '32px', 
