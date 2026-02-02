@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/components/AuthProvider';
 import LoginPage from '@/components/LoginPage';
+import PendingApproval from '@/components/PendingApproval';
 import Link from 'next/link';
 
 const BenefitArcLogo = ({ size = 60 }) => (
@@ -87,7 +88,7 @@ const ComingSoonCard = ({ title, description }) => (
 );
 
 export default function Home() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, isApproved, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -102,10 +103,17 @@ export default function Home() {
     );
   }
 
+  // Not logged in - show login page
   if (!user) {
     return <LoginPage />;
   }
 
+  // Logged in but not approved - show pending page
+  if (!isApproved) {
+    return <PendingApproval />;
+  }
+
+  // Approved - show main app
   return (
     <div style={{
       minHeight: '100vh',
@@ -128,8 +136,20 @@ export default function Home() {
         background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)', pointerEvents: 'none',
       }} />
       
-      {/* Sign Out Button */}
-      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10 }}>
+      {/* Top Bar */}
+      <div style={{ 
+        position: 'absolute', top: '20px', right: '20px', zIndex: 10,
+        display: 'flex', alignItems: 'center', gap: '12px',
+      }}>
+        {isAdmin && (
+          <span style={{
+            padding: '4px 10px', borderRadius: '6px',
+            background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)',
+            color: '#10b981', fontSize: '10px', fontWeight: '600',
+          }}>
+            ADMIN
+          </span>
+        )}
         <button
           onClick={() => signOut()}
           style={{
