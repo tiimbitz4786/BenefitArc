@@ -204,7 +204,13 @@ export default function Home() {
             Coming Soon
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-            <ComingSoonCard title="Case Pipeline Analyzer" description="Track and forecast your case pipeline from intake through resolution with stage-by-stage analytics." />
+          <ToolCard
+  title="Case Pipeline Analyzer"
+  description="Analyze your current caseload value. Calculate expected revenue by stage using your average fees and historical win rates."
+  icon="📋" status="Live" gradient="linear-gradient(135deg, #a855f7 0%, #d946ef 100%)"
+  features={['Pipeline Valuation', 'Stage Analysis', 'Revenue Projections', 'Saved Fee Data']}
+  href="/case-pipeline"
+/>
             <ComingSoonCard title="Marketing ROI Calculator" description="Measure marketing effectiveness by channel and calculate true cost per signed case." />
             <ComingSoonCard title="Staffing Optimizer" description="Model optimal staffing levels based on caseload, case mix, and productivity targets." />
           </div>
