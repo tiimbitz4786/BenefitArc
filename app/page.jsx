@@ -198,19 +198,19 @@ export default function Home() {
               features={['Revenue Modeling', '3-Tier Fee Analysis', 'Break-Even Analysis', 'What-If Scenarios']}
               href="/steady-state"
             />
+            <ToolCard
+              title="Case Pipeline Analyzer"
+              description="Analyze your current caseload value. Calculate expected revenue by stage using your average fees and historical win rates."
+              icon="📋" status="Live" gradient="linear-gradient(135deg, #a855f7 0%, #d946ef 100%)"
+              features={['Pipeline Valuation', 'Stage Analysis', 'Revenue Projections', 'Saved Fee Data']}
+              href="/case-pipeline"
+            />
           </div>
           
           <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '24px', marginTop: '48px' }}>
             Coming Soon
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-          <ToolCard
-  title="Case Pipeline Analyzer"
-  description="Analyze your current caseload value. Calculate expected revenue by stage using your average fees and historical win rates."
-  icon="📋" status="Live" gradient="linear-gradient(135deg, #a855f7 0%, #d946ef 100%)"
-  features={['Pipeline Valuation', 'Stage Analysis', 'Revenue Projections', 'Saved Fee Data']}
-  href="/case-pipeline"
-/>
             <ComingSoonCard title="Marketing ROI Calculator" description="Measure marketing effectiveness by channel and calculate true cost per signed case." />
             <ComingSoonCard title="Staffing Optimizer" description="Model optimal staffing levels based on caseload, case mix, and productivity targets." />
           </div>
