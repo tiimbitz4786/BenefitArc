@@ -1459,22 +1459,23 @@ export default function CasePipelineAnalyzer() {
   // STEP 3: ANALYSIS RESULTS
   // ============================================
   
-  const renderStep3 = () => {
-    const pieData = analysis.stageData
-      .filter(s => s.expectedRevenue > 0)
-      .map(s => ({
-        name: s.shortLabel,
-        value: s.expectedRevenue,
-        color: s.color,
-      }));
-    
-    const barData = analysis.stageData.map(s => ({
+  // Memoize chart data to prevent unnecessary Recharts re-renders
+  const pieData = useMemo(() => analysis.stageData
+    .filter(s => s.expectedRevenue > 0)
+    .map(s => ({
       name: s.shortLabel,
-      cases: s.caseCount,
-      revenue: s.expectedRevenue,
+      value: s.expectedRevenue,
       color: s.color,
-    }));
-    
+    })), [analysis.stageData]);
+
+  const barData = useMemo(() => analysis.stageData.map(s => ({
+    name: s.shortLabel,
+    cases: s.caseCount,
+    revenue: s.expectedRevenue,
+    color: s.color,
+  })), [analysis.stageData]);
+
+  const renderStep3 = () => {
     return (
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px', textAlign: 'center' }}>
@@ -1780,8 +1781,8 @@ export default function CasePipelineAnalyzer() {
                   formatter={(value) => [formatCurrency(value), 'Expected Revenue']}
                 />
                 <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
-                  {barData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {barData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -1809,8 +1810,8 @@ export default function CasePipelineAnalyzer() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {pieData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip

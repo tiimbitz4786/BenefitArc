@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import * as XLSX from 'xlsx';
+// XLSX is dynamically imported only when an Excel file is uploaded (see parseFile)
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
 
@@ -222,21 +222,28 @@ const EXCLUDED_REVENUE_KEYWORDS = [
   'extraordinary', 'non-operating',
 ];
 
+// Pre-compile RegExp cache for short keywords (built once at module load)
+const keywordRegexCache = new Map();
+const getKeywordRegex = (kw) => {
+  if (!keywordRegexCache.has(kw)) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    keywordRegexCache.set(kw, new RegExp('\\b' + escaped + '\\b', 'i'));
+  }
+  return keywordRegexCache.get(kw);
+};
+
+// Pre-compute lowercased keyword sets for O(1) substring checks
+const SS_KEYWORDS_LOWER = SS_KEYWORDS.map(kw => kw.toLowerCase());
+const NON_SS_KEYWORDS_LOWER = NON_SS_KEYWORDS.map(kw => kw.toLowerCase());
+
 // Helper: Check if text contains any keyword from a list
 // Uses word boundaries for short keywords to avoid false matches
 const containsKeyword = (text, keywords) => {
   const lower = text.toLowerCase();
   return keywords.some(kw => {
     const kwLower = kw.toLowerCase();
-    // For very short keywords (2-3 chars like 'va', 'pi'), require word boundary
     if (kwLower.length <= 3 && !kwLower.includes(' ')) {
-      // Create regex with word boundaries
-      try {
-        const regex = new RegExp('\\b' + kwLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-        return regex.test(lower);
-      } catch (e) {
-        return lower.includes(kwLower);
-      }
+      return getKeywordRegex(kwLower).test(lower);
     }
     return lower.includes(kwLower);
   });
@@ -245,9 +252,8 @@ const containsKeyword = (text, keywords) => {
 // Helper: Check if text is SS-related
 const isSSRelated = (text) => {
   const lower = text.toLowerCase();
-  // Must contain SS keyword AND not contain exclusion keywords
   const hasSSKeyword = containsKeyword(text, SS_KEYWORDS);
-  const hasExclusion = NON_SS_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
+  const hasExclusion = NON_SS_KEYWORDS_LOWER.some(kw => lower.includes(kw));
   return hasSSKeyword && !hasExclusion;
 };
 
@@ -411,6 +417,7 @@ export default function T12Analyzer() {
       // Handle xlsx files using SheetJS
       const fileName = file.name.toLowerCase();
       if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const XLSX = await import('xlsx');
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
@@ -1997,21 +2004,25 @@ export default function T12Analyzer() {
   // ============================================
   // STEP 3: REPORT
   // ============================================
+
+  // Memoize chart data to prevent unnecessary Recharts re-renders
+  const pieData = useMemo(() => [
+    { name: 'Marketing', value: summary.marketingPct, color: '#3b82f6' },
+    { name: 'Labor', value: summary.laborPct, color: '#6366f1' },
+    { name: 'Other', value: summary.otherPct, color: '#8b5cf6' },
+    { name: 'Profit', value: Math.max(0, summary.profitPct), color: '#10b981' },
+  ].filter(d => d.value > 0), [summary.marketingPct, summary.laborPct, summary.otherPct, summary.profitPct]);
+
+  const barData = useMemo(() => [
+    { name: 'Marketing', amount: summary.marketing, pct: summary.marketingPct, color: '#3b82f6' },
+    { name: 'Labor', amount: summary.labor, pct: summary.laborPct, color: '#6366f1' },
+    { name: 'Other', amount: summary.other, pct: summary.otherPct, color: '#8b5cf6' },
+    { name: 'Profit', amount: summary.profit, pct: summary.profitPct, color: '#10b981' },
+  ], [summary.marketing, summary.marketingPct, summary.labor, summary.laborPct, summary.other, summary.otherPct, summary.profit, summary.profitPct]);
+
+  const barDataFiltered = useMemo(() => barData.filter(d => d.name !== 'Profit'), [barData]);
+
   const renderStep3 = () => {
-    const pieData = [
-      { name: 'Marketing', value: summary.marketingPct, color: '#3b82f6' },
-      { name: 'Labor', value: summary.laborPct, color: '#6366f1' },
-      { name: 'Other', value: summary.otherPct, color: '#8b5cf6' },
-      { name: 'Profit', value: Math.max(0, summary.profitPct), color: '#10b981' },
-    ].filter(d => d.value > 0);
-
-    const barData = [
-      { name: 'Marketing', amount: summary.marketing, pct: summary.marketingPct, color: '#3b82f6' },
-      { name: 'Labor', amount: summary.labor, pct: summary.laborPct, color: '#6366f1' },
-      { name: 'Other', amount: summary.other, pct: summary.otherPct, color: '#8b5cf6' },
-      { name: 'Profit', amount: summary.profit, pct: summary.profitPct, color: '#10b981' },
-    ];
-
     return (
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
@@ -2224,8 +2235,8 @@ export default function T12Analyzer() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {pieData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip 
@@ -2255,16 +2266,16 @@ export default function T12Analyzer() {
               Expense Comparison
             </h3>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={barData.filter(d => d.name !== 'Profit')} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+              <BarChart data={barDataFiltered} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                 <XAxis dataKey="name" stroke="#6366f1" fontSize={10} tickLine={false} />
                 <YAxis stroke="#6366f1" fontSize={9} tickFormatter={(v) => `$${(v/1000).toFixed(0)}K`} tickLine={false} axisLine={false} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#0f0f19', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px', fontSize: '11px' }}
                   formatter={(value) => [formatCurrency(value), '']}
                 />
                 <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                  {barData.filter(d => d.name !== 'Profit').map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {barDataFiltered.map((entry, index) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>

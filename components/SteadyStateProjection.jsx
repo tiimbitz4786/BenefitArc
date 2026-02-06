@@ -1159,12 +1159,20 @@ export default function RevenueForecastSetup() {
   // ============================================
   // STEP 5: RESULTS DASHBOARD
   // ============================================
+  // Memoize chart data to prevent unnecessary Recharts re-renders
+  const intakeData = useMemo(() => DATA_YEARS.map(year => ({
+    year: String(year),
+    intake: parseInt(firmData.eventsByYear[year]?.signUps) || 0,
+  })).filter(d => d.intake > 0), [firmData.eventsByYear]);
+
+  // Memoize projection year lookup for chart dot rendering
+  const projectionYearMap = useMemo(() => {
+    const map = new Map();
+    projections.forEach(p => map.set(p.year, p));
+    return map;
+  }, [projections]);
+
   const renderStep5 = () => {
-    const intakeData = DATA_YEARS.map(year => ({
-      year: String(year),
-      intake: parseInt(firmData.eventsByYear[year]?.signUps) || 0,
-    })).filter(d => d.intake > 0);
-    
     return (
       <div>
         {/* Header */}
@@ -1330,10 +1338,10 @@ export default function RevenueForecastSetup() {
                   stroke="#6366f1" 
                   strokeWidth={2.5}
                   dot={(props) => {
-                    const proj = projections.find(p => p.year === props.payload?.year);
+                    const proj = projectionYearMap.get(props.payload?.year);
                     return (
-                      <circle cx={props.cx} cy={props.cy} r={proj?.isActual ? 5 : 3} 
-                        fill={proj?.isActual ? '#10b981' : '#6366f1'} 
+                      <circle cx={props.cx} cy={props.cy} r={proj?.isActual ? 5 : 3}
+                        fill={proj?.isActual ? '#10b981' : '#6366f1'}
                         stroke={proj?.isActual ? '#10b981' : '#6366f1'} strokeWidth={2} />
                     );
                   }}
