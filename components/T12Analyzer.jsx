@@ -1,6 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthProvider';
 
 // ============================================
 // BENEFITARC T12 P&L ANALYSIS
@@ -261,7 +263,12 @@ const getTotalForSection = (text) => {
   return null;
 };
 
+// Normalize description for consistent rule matching
+const normalizeDescription = (desc) => desc.toLowerCase().trim().replace(/\s+/g, ' ');
+
 export default function T12Analyzer() {
+  const { user } = useAuth();
+
   // Steps: 0 = welcome, 1 = upload, 1.5 = resolve uncategorized, 2 = categorize SS expenses, 3 = report
   const [step, setStep] = useState(0);
   const [dataConfirmed, setDataConfirmed] = useState(false);
@@ -277,6 +284,121 @@ export default function T12Analyzer() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [textInput, setTextInput] = useState('');
   const [showTextInput, setShowTextInput] = useState(false);
+
+  // Saved categorization rules
+  const [savedRules, setSavedRules] = useState({});
+  const [rulesLoading, setRulesLoading] = useState(true);
+  const [rulesSaveError, setRulesSaveError] = useState('');
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [rulesSearchTerm, setRulesSearchTerm] = useState('');
+
+  // ============================================
+  // LOAD SAVED CATEGORIZATION RULES
+  // ============================================
+
+  useEffect(() => {
+    const loadRules = async () => {
+      if (!user) {
+        setRulesLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('t12_categorization_rules')
+          .select('id, description_key, description_display, decision, partial_percent, category, updated_at')
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        if (data) {
+          const rulesMap = {};
+          data.forEach(rule => {
+            rulesMap[rule.description_key] = {
+              id: rule.id,
+              descriptionDisplay: rule.description_display,
+              decision: rule.decision,
+              partialPercent: rule.partial_percent,
+              category: rule.category,
+              updatedAt: rule.updated_at,
+            };
+          });
+          setSavedRules(rulesMap);
+        }
+      } catch (err) {
+        // Rules load failed - tool still works, just without memory
+      } finally {
+        setRulesLoading(false);
+      }
+    };
+
+    loadRules();
+  }, [user]);
+
+  // ============================================
+  // SAVE / DELETE CATEGORIZATION RULES
+  // ============================================
+
+  const saveRule = useCallback(async (description, decision, partialPercent = null, category = null) => {
+    if (!user) return;
+
+    const descriptionKey = normalizeDescription(description);
+
+    // Optimistic local update
+    setSavedRules(prev => ({
+      ...prev,
+      [descriptionKey]: {
+        descriptionDisplay: description,
+        decision,
+        partialPercent,
+        category,
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+
+    // Persist to Supabase
+    try {
+      const { error } = await supabase
+        .from('t12_categorization_rules')
+        .upsert({
+          user_id: user.id,
+          description_key: descriptionKey,
+          description_display: description,
+          decision,
+          partial_percent: partialPercent,
+          category,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,description_key' });
+
+      if (error) throw error;
+    } catch (err) {
+      setRulesSaveError('Failed to save rule');
+      setTimeout(() => setRulesSaveError(''), 3000);
+    }
+  }, [user]);
+
+  const deleteRule = useCallback(async (descriptionKey) => {
+    if (!user) return;
+
+    // Optimistic local removal
+    setSavedRules(prev => {
+      const next = { ...prev };
+      delete next[descriptionKey];
+      return next;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('t12_categorization_rules')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('description_key', descriptionKey);
+
+      if (error) throw error;
+    } catch (err) {
+      // Delete failed silently - rule will reappear on next load
+    }
+  }, [user]);
 
   // Parse uploaded P&L file - Categorize items as SS, Non-SS, or Uncategorized
   const parseFile = useCallback(async (file) => {
@@ -547,7 +669,31 @@ export default function T12Analyzer() {
               useAutoPercent: false,
             };
             
-            if (inSSSubsection) {
+            // Check saved user rules FIRST, then fall back to keyword logic
+            const descKey = normalizeDescription(description);
+            const savedRule = savedRules[descKey];
+
+            if (savedRule) {
+              // User has a saved categorization for this item
+              if (savedRule.decision === 'include') {
+                ssItems.push({
+                  ...item,
+                  category: savedRule.category || category,
+                  autoAppliedRule: true,
+                });
+              } else if (savedRule.decision === 'partial' && savedRule.partialPercent > 0) {
+                const partialAmount = absAmount * (savedRule.partialPercent / 100);
+                ssItems.push({
+                  ...item,
+                  amount: partialAmount,
+                  originalAmount: absAmount,
+                  appliedPercent: savedRule.partialPercent,
+                  category: savedRule.category || category,
+                  autoAppliedRule: true,
+                });
+              }
+              // savedRule.decision === 'exclude' → item silently excluded
+            } else if (inSSSubsection) {
               // Clearly SS - add directly
               ssItems.push(item);
             } else if (inNonSSSubsection) {
@@ -601,7 +747,7 @@ export default function T12Analyzer() {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [savedRules]);
 
   // File upload validation
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -638,12 +784,16 @@ export default function T12Analyzer() {
 
   // Change category for an item
   const changeCategory = useCallback((itemId, newCategory) => {
-    setCategorizedItems(prev => 
-      prev.map(item => 
-        item.id === itemId ? { ...item, category: newCategory } : item
-      )
+    setCategorizedItems(prev =>
+      prev.map(item => {
+        if (item.id === itemId) {
+          saveRule(item.description, 'include', item.appliedPercent || null, newCategory);
+          return { ...item, category: newCategory };
+        }
+        return item;
+      })
     );
-  }, []);
+  }, [saveRule]);
 
   // Drag and drop handlers
   const handleDragStart = (e, item) => {
@@ -803,7 +953,7 @@ export default function T12Analyzer() {
               <li><strong>Zero Server Transmission</strong> — No financial data is ever sent to any server</li>
               <li><strong>No Training Use</strong> — Your data is NOT used to train any AI models</li>
               <li><strong>Immediate Deletion</strong> — All data is permanently erased when you close this page</li>
-              <li><strong>No Storage</strong> — Nothing is saved to cookies, local storage, or any database</li>
+              <li><strong>No Raw Data Storage</strong> — Your P&L file data is never saved. Only your categorization preferences (line item names and how you classified them) are stored to speed up future analyses.</li>
             </ul>
           </div>
         </div>
@@ -945,6 +1095,26 @@ export default function T12Analyzer() {
       >
         Continue to Upload →
       </button>
+
+      {user && Object.keys(savedRules).length > 0 && (
+        <button
+          onClick={() => setShowRulesModal(true)}
+          style={{
+            width: '100%',
+            padding: '10px',
+            borderRadius: '10px',
+            marginTop: '12px',
+            border: '1px solid rgba(99, 102, 241, 0.3)',
+            background: 'rgba(99, 102, 241, 0.1)',
+            color: '#a5b4fc',
+            fontSize: '12px',
+            fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          Manage Saved Rules ({Object.keys(savedRules).length})
+        </button>
+      )}
     </div>
   );
 
@@ -1146,31 +1316,45 @@ export default function T12Analyzer() {
   const handleItemDecision = useCallback((itemId, decision, partialPercent = null, useAuto = false) => {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.id === itemId) {
+        const effectivePercent = decision === 'partial'
+          ? (useAuto ? ssRevenuePercent : partialPercent)
+          : null;
+
+        // Save rule for future uploads
+        saveRule(item.description, decision, effectivePercent, item.category);
+
         return {
           ...item,
           decision,
-          partialPercent: decision === 'partial' ? (useAuto ? ssRevenuePercent : partialPercent) : null,
+          partialPercent: effectivePercent,
           useAutoPercent: useAuto,
         };
       }
       return item;
     }));
-  }, [ssRevenuePercent]);
+  }, [ssRevenuePercent, saveRule]);
   
   // Handle bulk decision for all items in a section
   const handleSectionDecision = useCallback((sectionPath, decision, partialPercent = null, useAuto = false) => {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.sectionPath === sectionPath) {
+        const effectivePercent = decision === 'partial'
+          ? (useAuto ? ssRevenuePercent : partialPercent)
+          : null;
+
+        // Save rule for each item in the section
+        saveRule(item.description, decision, effectivePercent, item.category);
+
         return {
           ...item,
           decision,
-          partialPercent: decision === 'partial' ? (useAuto ? ssRevenuePercent : partialPercent) : null,
+          partialPercent: effectivePercent,
           useAutoPercent: useAuto,
         };
       }
       return item;
     }));
-  }, [ssRevenuePercent]);
+  }, [ssRevenuePercent, saveRule]);
   
   // Group uncategorized items by section path for display
   const groupedUncategorizedItems = useMemo(() => {
@@ -1223,6 +1407,11 @@ export default function T12Analyzer() {
   
   // Check if all uncategorized items have decisions
   const allDecisionsMade = uncategorizedItems.every(item => item.decision !== null);
+
+  // Count items auto-applied from saved rules
+  const autoAppliedCount = useMemo(() => {
+    return categorizedItems.filter(item => item.autoAppliedRule).length;
+  }, [categorizedItems]);
   
   const renderStep1_5 = () => (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -1233,12 +1422,41 @@ export default function T12Analyzer() {
         <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#f1f5f9', marginBottom: '6px' }}>
           Resolve Shared/Overhead Expenses
         </h2>
-        <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: '1.5' }}>
-          These expenses couldn't be automatically identified as Social Security-specific. 
-          Please indicate how to handle each one.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: '1.5', flex: 1 }}>
+            These expenses couldn't be automatically identified as Social Security-specific.
+            Please indicate how to handle each one.
+          </p>
+          {user && Object.keys(savedRules).length > 0 && (
+            <button
+              onClick={() => setShowRulesModal(true)}
+              style={{
+                padding: '6px 12px', borderRadius: '6px', whiteSpace: 'nowrap',
+                border: '1px solid rgba(99, 102, 241, 0.3)', background: 'rgba(99, 102, 241, 0.1)',
+                color: '#a5b4fc', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+              }}
+            >
+              Saved Rules ({Object.keys(savedRules).length})
+            </button>
+          )}
+        </div>
       </div>
-      
+
+      {/* Auto-applied rules banner */}
+      {autoAppliedCount > 0 && (
+        <div style={{
+          padding: '10px 16px',
+          background: 'rgba(16, 185, 129, 0.1)',
+          borderRadius: '10px',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          marginBottom: '16px',
+          fontSize: '12px',
+          color: '#10b981',
+        }}>
+          {autoAppliedCount} item(s) were automatically categorized based on your previous decisions.
+        </div>
+      )}
+
       {/* SS Revenue Context */}
       <div style={{
         padding: '14px 18px',
@@ -1531,11 +1749,25 @@ export default function T12Analyzer() {
         <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#f1f5f9', marginBottom: '6px' }}>
           Review & Adjust Categories
         </h2>
-        <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: '1.5' }}>
-          We've auto-categorized your expenses. Drag items between categories or use the dropdown to adjust.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: '1.5', flex: 1 }}>
+            We've auto-categorized your expenses. Drag items between categories or use the dropdown to adjust.
+          </p>
+          {user && Object.keys(savedRules).length > 0 && (
+            <button
+              onClick={() => setShowRulesModal(true)}
+              style={{
+                padding: '6px 12px', borderRadius: '6px', whiteSpace: 'nowrap',
+                border: '1px solid rgba(99, 102, 241, 0.3)', background: 'rgba(99, 102, 241, 0.1)',
+                color: '#a5b4fc', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+              }}
+            >
+              Saved Rules ({Object.keys(savedRules).length})
+            </button>
+          )}
+        </div>
       </div>
-      
+
       {/* Revenue Input */}
       <div style={{
         padding: '16px 20px',
@@ -1655,18 +1887,27 @@ export default function T12Analyzer() {
                           {item.description}
                         </div>
                         {item.sectionPath && (
-                          <div style={{ 
-                            fontSize: '9px', 
+                          <div style={{
+                            fontSize: '9px',
                             color: '#64748b',
                             marginTop: '2px',
                           }}>
                             {item.sectionPath}
                           </div>
                         )}
+                        {item.autoAppliedRule && (
+                          <div style={{
+                            fontSize: '9px',
+                            color: '#10b981',
+                            marginTop: '2px',
+                          }}>
+                            Auto-applied from saved rule
+                          </div>
+                        )}
                       </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        fontWeight: '600', 
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
                         color: item.isNegative ? '#f87171' : config.color,
                         whiteSpace: 'nowrap',
                       }}>
@@ -2104,6 +2345,142 @@ export default function T12Analyzer() {
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
       </div>
+
+      {/* Rules Management Modal */}
+      {showRulesModal && (() => {
+        const allRules = Object.entries(savedRules)
+          .map(([key, rule]) => ({ key, ...rule }))
+          .filter(rule => {
+            if (!rulesSearchTerm) return true;
+            return rule.descriptionDisplay.toLowerCase().includes(rulesSearchTerm.toLowerCase());
+          })
+          .sort((a, b) => a.descriptionDisplay.localeCompare(b.descriptionDisplay));
+
+        return (
+          <div
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => { setShowRulesModal(false); setRulesSearchTerm(''); }}
+          >
+            <div
+              style={{
+                width: '90%', maxWidth: '800px', maxHeight: '80vh',
+                background: 'linear-gradient(135deg, #0f0f19 0%, #141423 100%)',
+                borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.3)',
+                overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '20px 24px', borderBottom: '1px solid rgba(99,102,241,0.2)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#f1f5f9', margin: 0 }}>
+                    Saved Categorization Rules
+                  </h2>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0' }}>
+                    {Object.keys(savedRules).length} rule(s) saved — these are applied automatically on future uploads
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setShowRulesModal(false); setRulesSearchTerm(''); }}
+                  style={{
+                    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+                    borderRadius: '8px', color: '#94a3b8', fontSize: '14px', cursor: 'pointer',
+                    width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  X
+                </button>
+              </div>
+
+              {/* Search */}
+              <div style={{ padding: '12px 24px' }}>
+                <input
+                  type="text"
+                  placeholder="Search rules..."
+                  value={rulesSearchTerm}
+                  onChange={e => setRulesSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: '8px',
+                    border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(15,15,25,0.8)',
+                    color: '#e2e8f0', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Rules list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 20px' }}>
+                {allRules.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+                    {rulesSearchTerm
+                      ? 'No rules match your search.'
+                      : 'No saved rules yet. Rules are saved automatically as you categorize items.'}
+                  </div>
+                ) : (
+                  allRules.map(rule => (
+                    <div key={rule.key} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '12px 0', borderBottom: '1px solid rgba(99,102,241,0.1)',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#e2e8f0', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {rule.descriptionDisplay}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '600',
+                            background: rule.decision === 'include' ? 'rgba(16,185,129,0.2)' : rule.decision === 'exclude' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
+                            color: rule.decision === 'include' ? '#10b981' : rule.decision === 'exclude' ? '#ef4444' : '#f59e0b',
+                          }}>
+                            {rule.decision === 'include' ? 'Include' : rule.decision === 'exclude' ? 'Exclude' : `Partial (${rule.partialPercent}%)`}
+                          </span>
+                          {rule.category && (
+                            <span style={{
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '600',
+                              background: rule.category === 'marketing' ? 'rgba(59,130,246,0.2)' : rule.category === 'labor' ? 'rgba(99,102,241,0.2)' : 'rgba(139,92,246,0.2)',
+                              color: rule.category === 'marketing' ? '#3b82f6' : rule.category === 'labor' ? '#6366f1' : '#8b5cf6',
+                            }}>
+                              {rule.category.charAt(0).toUpperCase() + rule.category.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteRule(rule.key)}
+                        style={{
+                          padding: '6px 12px', borderRadius: '6px', marginLeft: '12px',
+                          border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
+                          color: '#ef4444', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Save error toast */}
+              {rulesSaveError && (
+                <div style={{
+                  padding: '10px 24px', background: 'rgba(239,68,68,0.1)',
+                  borderTop: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: '12px',
+                }}>
+                  {rulesSaveError}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
