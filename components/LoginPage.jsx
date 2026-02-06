@@ -24,7 +24,7 @@ export default function LoginPage() {
     if (isSignUp) {
       const { data, error } = await signUp(email, password);
       if (error) {
-        setError(error.message);
+        setError('Unable to create account. Please check your details and try again.');
       } else {
         setMessage('Account created! Your request is pending admin approval. You will be notified when approved.');
         setIsSignUp(false);
@@ -33,7 +33,7 @@ export default function LoginPage() {
     } else {
       const { data, error } = await signIn(email, password);
       if (error) {
-        setError(error.message);
+        setError('Invalid email or password.');
       }
       // Note: approval check happens in the parent component
     }

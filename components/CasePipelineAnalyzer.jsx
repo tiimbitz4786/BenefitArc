@@ -148,6 +148,7 @@ export default function CasePipelineAnalyzer() {
   const [feeInputMethod, setFeeInputMethod] = useState(null); // 'direct' or 'calculate'
   const [feesLoading, setFeesLoading] = useState(true);
   const [feesSaving, setFeesSaving] = useState(false);
+  const [feeSaveError, setFeeSaveError] = useState('');
   
   // Fee data - initialized with defaults, user can override
   const [fees, setFees] = useState({
@@ -204,7 +205,7 @@ export default function CasePipelineAnalyzer() {
       try {
         const { data, error } = await supabase
           .from('user_fee_data')
-          .select('*')
+          .select('application_fee, reconsideration_fee, hearing_fee, appeals_council_fee, federal_court_fee')
           .eq('user_id', user.id)
           .single();
         
@@ -219,7 +220,7 @@ export default function CasePipelineAnalyzer() {
         }
       } catch (err) {
         // No saved data yet - that's fine
-        console.log('No saved fee data found');
+        // No saved data yet - use defaults
       } finally {
         setFeesLoading(false);
       }
@@ -236,7 +237,8 @@ export default function CasePipelineAnalyzer() {
     if (!user) return;
     
     setFeesSaving(true);
-    
+    setFeeSaveError('');
+
     try {
       const feeData = {
         user_id: user.id,
@@ -255,8 +257,7 @@ export default function CasePipelineAnalyzer() {
       if (error) throw error;
       
     } catch (err) {
-      console.error('Error saving fee data:', err);
-      alert('Error saving fee data. Please try again.');
+      setFeeSaveError('Error saving fee data. Please try again.');
     } finally {
       setFeesSaving(false);
     }
@@ -936,6 +937,20 @@ export default function CasePipelineAnalyzer() {
               {feesSaving ? 'Saving...' : 'Save & Continue →'}
             </button>
           </div>
+          {feeSaveError && (
+            <div style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fca5a5',
+              fontSize: '12px',
+              textAlign: 'center',
+            }}>
+              {feeSaveError}
+            </div>
+          )}
         </div>
       );
     }

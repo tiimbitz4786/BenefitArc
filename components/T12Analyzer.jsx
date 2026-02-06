@@ -581,10 +581,7 @@ export default function T12Analyzer() {
       setTotalFirmRevenue(adjustedFirmRevenue); // Store adjusted, not raw
       setSsRevenuePercent(ssPercent);
       
-      // Log excluded revenue for debugging (can be removed later)
-      if (excludedRevenue > 0) {
-        console.log(`Excluded ${excludedRevenue} from firm revenue calculation (ERC, grants, etc.)`);
-      }
+      // Excluded revenue items (ERC, grants, etc.) have been removed from firm revenue total
       
       // If there are uncategorized items, go to step 1.5 to resolve them
       // Otherwise skip to step 2
@@ -606,11 +603,28 @@ export default function T12Analyzer() {
     }
   }, []);
 
+  // File upload validation
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_EXTENSIONS = ['.xlsx', '.csv', '.txt'];
+
+  const validateFile = (file) => {
+    if (file.size > MAX_FILE_SIZE) {
+      setParseError('File is too large. Maximum size is 10MB.');
+      return false;
+    }
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      setParseError('Unsupported file type. Please upload an .xlsx, .csv, or .txt file.');
+      return false;
+    }
+    return true;
+  };
+
   // Handle file drop
   const handleFileDrop = useCallback((e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files[0] || e.target?.files[0];
-    if (file) {
+    if (file && validateFile(file)) {
       parseFile(file);
     }
   }, [parseFile]);

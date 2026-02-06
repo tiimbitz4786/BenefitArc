@@ -17,7 +17,7 @@ export function AuthProvider({ children }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('is_approved, is_admin')
         .eq('id', userId)
         .single();
       
@@ -26,7 +26,6 @@ export function AuthProvider({ children }) {
       }
       return data;
     } catch (err) {
-      console.error('Error fetching profile:', err);
       return null;
     }
   };
@@ -41,7 +40,7 @@ export function AuthProvider({ children }) {
           await fetchProfile(session.user.id);
         }
       } catch (err) {
-        console.error('Error getting session:', err);
+        // Session retrieval failed silently
       } finally {
         setLoading(false);
         setInitialLoadDone(true);
