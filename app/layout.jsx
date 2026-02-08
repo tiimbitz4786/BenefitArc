@@ -1,6 +1,8 @@
 import './globals.css'
 import AuthWrapper from '@/components/AuthWrapper'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'BenefitArc Tools',
   description: 'Financial analytics for Social Security Disability law practices',
