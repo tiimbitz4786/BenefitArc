@@ -51,10 +51,13 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Only show loading for real auth transitions, not token refreshes
+        const isAuthTransition = event === 'SIGNED_IN' || event === 'SIGNED_OUT';
+
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          if (initialLoadDone.current) {
+          if (initialLoadDone.current && isAuthTransition) {
             setLoading(true);
           }
           await fetchProfile(session.user.id);
@@ -62,7 +65,7 @@ export function AuthProvider({ children }) {
           setProfile(null);
         }
 
-        if (initialLoadDone.current) {
+        if (initialLoadDone.current && isAuthTransition) {
           setLoading(false);
         }
       }
