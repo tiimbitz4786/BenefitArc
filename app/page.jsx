@@ -185,6 +185,14 @@ export default function Home() {
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '40px' }}>
             <ToolCard
+              title="KPI Settings"
+              description="Set your firm's key performance indicators. These values serve as defaults across all BenefitArc tools."
+              icon="⚙️" status="Live"
+              gradient="linear-gradient(135deg, #10b981 0%, #6366f1 100%)"
+              features={['Fee Per Sign-Up', 'Win Rates', 'Fees Per Win', 'Closed No Fee %']}
+              href="/kpi-settings"
+            />
+            <ToolCard
               title="T12 P&L Analysis"
               description="Analyze your trailing 12-month Profit & Loss report. Automatically categorizes SS-specific expenses into Marketing, Labor, and Other buckets for benchmarking."
               icon="📊" status="Live" gradient="linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)"

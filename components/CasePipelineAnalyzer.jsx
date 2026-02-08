@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, FunnelChart, Funnel, LabelList } from 'recharts';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
+import { useKpis, DEFAULT_KPIS } from './KpiProvider';
+import Link from 'next/link';
 
 // ============================================
 // BENEFITARC CASE PIPELINE ANALYZER
@@ -144,12 +145,10 @@ function BenefitArcLogo({ size = 72 }) {
 
 export default function CasePipelineAnalyzer() {
   const { user } = useAuth();
+  const { kpis, kpisLoading } = useKpis();
   const [step, setStep] = useState(0);
   const [feeInputMethod, setFeeInputMethod] = useState(null); // 'direct' or 'calculate'
-  const [feesLoading, setFeesLoading] = useState(true);
-  const [feesSaving, setFeesSaving] = useState(false);
-  const [feeSaveError, setFeeSaveError] = useState('');
-  
+
   // Fee data - initialized with defaults, user can override
   const [fees, setFees] = useState({
     application: DEFAULT_FEES.application.toString(),
@@ -195,73 +194,26 @@ export default function CasePipelineAnalyzer() {
   const [attritionRate, setAttritionRate] = useState(10);
 
   // ============================================
-  // LOAD SAVED FEE DATA
+  // INITIALIZE FROM KPI CONTEXT
   // ============================================
-  
+
   useEffect(() => {
-    const loadFeeData = async () => {
-      if (!user) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('user_fee_data')
-          .select('application_fee, reconsideration_fee, hearing_fee, appeals_council_fee, federal_court_fee')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (data) {
-          setFees({
-            application: data.application_fee?.toString() || '',
-            reconsideration: data.reconsideration_fee?.toString() || '',
-            hearing: data.hearing_fee?.toString() || '',
-            appeals_council: data.appeals_council_fee?.toString() || '',
-            federal_court: data.federal_court_fee?.toString() || '',
-          });
-        }
-      } catch (err) {
-        // No saved data yet - that's fine
-        // No saved data yet - use defaults
-      } finally {
-        setFeesLoading(false);
-      }
-    };
-    
-    loadFeeData();
-  }, [user]);
-
-  // ============================================
-  // SAVE FEE DATA
-  // ============================================
-  
-  const saveFeeData = async () => {
-    if (!user) return;
-    
-    setFeesSaving(true);
-    setFeeSaveError('');
-
-    try {
-      const feeData = {
-        user_id: user.id,
-        application_fee: parseFloat(fees.application) || null,
-        reconsideration_fee: parseFloat(fees.reconsideration) || null,
-        hearing_fee: parseFloat(fees.hearing) || null,
-        appeals_council_fee: parseFloat(fees.appeals_council) || null,
-        federal_court_fee: parseFloat(fees.federal_court) || null,
-        updated_at: new Date().toISOString(),
-      };
-      
-      const { error } = await supabase
-        .from('user_fee_data')
-        .upsert(feeData, { onConflict: 'user_id' });
-      
-      if (error) throw error;
-      
-    } catch (err) {
-      setFeeSaveError('Error saving fee data. Please try again.');
-    } finally {
-      setFeesSaving(false);
-    }
-  };
+    if (kpisLoading) return;
+    setFees({
+      application: (kpis.application_fee ?? DEFAULT_FEES.application).toString(),
+      reconsideration: (kpis.reconsideration_fee ?? DEFAULT_FEES.reconsideration).toString(),
+      hearing: (kpis.hearing_fee ?? DEFAULT_FEES.hearing).toString(),
+      appeals_council: (kpis.appeals_council_fee ?? DEFAULT_FEES.appeals_council).toString(),
+      federal_court: (kpis.federal_court_fee ?? DEFAULT_FEES.federal_court).toString(),
+    });
+    setWinRates({
+      application: kpis.application_win_rate ?? DEFAULT_WIN_RATES.application,
+      reconsideration: kpis.reconsideration_win_rate ?? DEFAULT_WIN_RATES.reconsideration,
+      hearing: kpis.hearing_win_rate ?? DEFAULT_WIN_RATES.hearing,
+      appeals_council: kpis.appeals_council_win_rate ?? DEFAULT_WIN_RATES.appeals_council,
+      federal_court: kpis.federal_court_win_rate ?? DEFAULT_WIN_RATES.federal_court,
+    });
+  }, [kpisLoading]);
 
   // ============================================
   // CALCULATE FEES FROM REVENUE/CASES
@@ -641,7 +593,7 @@ export default function CasePipelineAnalyzer() {
   // ============================================
   
   const renderStep1 = () => {
-    if (feesLoading) {
+    if (kpisLoading) {
       return (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
           Loading your saved fee data...
@@ -654,10 +606,15 @@ export default function CasePipelineAnalyzer() {
       return (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px', textAlign: 'center' }}>
-            Your Saved Fee Data
+            Your Fee Data
           </h2>
-          <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginBottom: '32px' }}>
-            We found your previously saved average fees.
+          <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginBottom: '12px' }}>
+            Default values loaded from your KPI Settings.
+          </p>
+          <p style={{ fontSize: '11px', textAlign: 'center', marginBottom: '32px' }}>
+            <Link href="/kpi-settings" style={{ color: '#6366f1', textDecoration: 'none' }}>
+              Update defaults in KPI Settings →
+            </Link>
           </p>
           
           <div style={{
@@ -915,42 +872,25 @@ export default function CasePipelineAnalyzer() {
               ← Back
             </button>
             <button
-              onClick={async () => {
-                await saveFeeData();
-                setStep(1.5);
-              }}
-              disabled={!hasCompleteFees || feesSaving}
+              onClick={() => setStep(1.5)}
+              disabled={!hasCompleteFees}
               style={{
                 flex: 2,
                 padding: '12px',
                 borderRadius: '10px',
                 border: 'none',
-                background: hasCompleteFees && !feesSaving
+                background: hasCompleteFees
                   ? 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)'
                   : 'rgba(168, 85, 247, 0.2)',
                 color: 'white',
                 fontSize: '13px',
                 fontWeight: '600',
-                cursor: hasCompleteFees && !feesSaving ? 'pointer' : 'not-allowed',
+                cursor: hasCompleteFees ? 'pointer' : 'not-allowed',
               }}
             >
-              {feesSaving ? 'Saving...' : 'Save & Continue →'}
+              Continue →
             </button>
           </div>
-          {feeSaveError && (
-            <div style={{
-              marginTop: '12px',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#fca5a5',
-              fontSize: '12px',
-              textAlign: 'center',
-            }}>
-              {feeSaveError}
-            </div>
-          )}
         </div>
       );
     }

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Area, Cell, PieChart, Pie } from 'recharts';
+import { useKpis } from './KpiProvider';
 
 // ============================================
 // REVENUE FORECAST MODEL - SETUP WIZARD v2
@@ -34,6 +35,7 @@ const DEFAULT_TIMING = {
 // ============================================
 
 export default function RevenueForecastSetup() {
+  const { kpis, kpisLoading } = useKpis();
   const [step, setStep] = useState(0); // 0 = welcome/security, 1-4 = data entry, 5 = results
   const [dataConfirmed, setDataConfirmed] = useState(false);
   const [firmData, setFirmData] = useState({
@@ -76,6 +78,14 @@ export default function RevenueForecastSetup() {
     },
   });
   
+  // Pre-populate closedNoFeePercent from KPI Settings if user hasn't entered one
+  useEffect(() => {
+    if (kpisLoading) return;
+    if (firmData.closedNoFeePercent === '' && kpis.closed_no_fee_percent && kpis.closed_no_fee_percent !== '') {
+      setFirmData(prev => ({ ...prev, closedNoFeePercent: kpis.closed_no_fee_percent.toString() }));
+    }
+  }, [kpisLoading]);
+
   // Track which years have data
   const dataCompleteness = useMemo(() => {
     const completeness = {};
@@ -946,6 +956,11 @@ export default function RevenueForecastSetup() {
           />
           <span style={{ color: '#94a3b8', fontSize: '13px' }}>%</span>
         </div>
+        {kpis.closed_no_fee_percent && kpis.closed_no_fee_percent !== '' && (
+          <p style={{ fontSize: '11px', color: '#6366f1', marginTop: '8px' }}>
+            Saved KPI: {kpis.closed_no_fee_percent}%
+          </p>
+        )}
       </div>
       
       <NavigationButtons onBack={() => setStep(2)} onNext={() => setStep(4)} />
