@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const AuthContext = createContext({});
@@ -11,16 +11,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const initialLoadDone = useRef(false);
 
   const fetchProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('is_approved, is_admin')
         .eq('id', userId)
         .single();
-      
+
       if (data) {
         setProfile(data);
       }
@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           await fetchProfile(session.user.id);
         }
@@ -43,7 +43,7 @@ export function AuthProvider({ children }) {
         // Session retrieval failed silently
       } finally {
         setLoading(false);
-        setInitialLoadDone(true);
+        initialLoadDone.current = true;
       }
     };
 
@@ -52,26 +52,24 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Only show loading on subsequent auth changes (sign in/out),
-          // not during the initial load which is handled by getSession
-          if (initialLoadDone) {
+          if (initialLoadDone.current) {
             setLoading(true);
           }
           await fetchProfile(session.user.id);
         } else {
           setProfile(null);
         }
-        
-        if (initialLoadDone) {
+
+        if (initialLoadDone.current) {
           setLoading(false);
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [initialLoadDone]);
+  }, []); // No dependencies - subscribe once
 
   const signUp = async (email, password) => {
     const { data, error } = await supabase.auth.signUp({
@@ -86,11 +84,11 @@ export function AuthProvider({ children }) {
       email,
       password,
     });
-    
+
     if (data?.user) {
       await fetchProfile(data.user.id);
     }
-    
+
     return { data, error };
   };
 
@@ -104,12 +102,12 @@ export function AuthProvider({ children }) {
   const isAdmin = profile?.is_admin || false;
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
+    <AuthContext.Provider value={{
+      user,
       profile,
-      loading, 
-      signUp, 
-      signIn, 
+      loading,
+      signUp,
+      signIn,
       signOut,
       isApproved,
       isAdmin,
