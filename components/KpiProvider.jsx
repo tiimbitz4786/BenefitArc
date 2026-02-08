@@ -21,6 +21,18 @@ export const DEFAULT_KPIS = {
   hearing_win_rate: 0.54,
   appeals_council_win_rate: 0.13,
   federal_court_win_rate: 0.64,
+  // Avg adjudication time in months (SSA FY2024, AARP Oct 2025, Atticus June 2024)
+  application_adj_months: 8,
+  reconsideration_adj_months: 7,
+  hearing_adj_months: 11,
+  appeals_council_adj_months: 9,
+  federal_court_adj_months: 15,
+  // Payment lag in days (no public source - user provides from firm experience)
+  application_payment_lag_days: '',
+  reconsideration_payment_lag_days: '',
+  hearing_payment_lag_days: '',
+  appeals_council_payment_lag_days: '',
+  federal_court_payment_lag_days: '',
 };
 
 export function KpiProvider({ children }) {
@@ -45,20 +57,11 @@ export function KpiProvider({ children }) {
           .single();
 
         if (kpiData && !kpiError) {
-          setKpis({
-            avg_fee_per_sign_up: kpiData.avg_fee_per_sign_up ?? DEFAULT_KPIS.avg_fee_per_sign_up,
-            closed_no_fee_percent: kpiData.closed_no_fee_percent ?? DEFAULT_KPIS.closed_no_fee_percent,
-            application_fee: kpiData.application_fee ?? DEFAULT_KPIS.application_fee,
-            reconsideration_fee: kpiData.reconsideration_fee ?? DEFAULT_KPIS.reconsideration_fee,
-            hearing_fee: kpiData.hearing_fee ?? DEFAULT_KPIS.hearing_fee,
-            appeals_council_fee: kpiData.appeals_council_fee ?? DEFAULT_KPIS.appeals_council_fee,
-            federal_court_fee: kpiData.federal_court_fee ?? DEFAULT_KPIS.federal_court_fee,
-            application_win_rate: kpiData.application_win_rate ?? DEFAULT_KPIS.application_win_rate,
-            reconsideration_win_rate: kpiData.reconsideration_win_rate ?? DEFAULT_KPIS.reconsideration_win_rate,
-            hearing_win_rate: kpiData.hearing_win_rate ?? DEFAULT_KPIS.hearing_win_rate,
-            appeals_council_win_rate: kpiData.appeals_council_win_rate ?? DEFAULT_KPIS.appeals_council_win_rate,
-            federal_court_win_rate: kpiData.federal_court_win_rate ?? DEFAULT_KPIS.federal_court_win_rate,
-          });
+          const loaded = {};
+          for (const key of Object.keys(DEFAULT_KPIS)) {
+            loaded[key] = kpiData[key] ?? DEFAULT_KPIS[key];
+          }
+          setKpis(loaded);
           setKpisLoading(false);
           return;
         }
@@ -96,22 +99,11 @@ export function KpiProvider({ children }) {
   const saveKpis = async (newKpis) => {
     if (!user) return { error: 'Not authenticated' };
 
-    const row = {
-      user_id: user.id,
-      avg_fee_per_sign_up: newKpis.avg_fee_per_sign_up || null,
-      closed_no_fee_percent: newKpis.closed_no_fee_percent || null,
-      application_fee: newKpis.application_fee ?? null,
-      reconsideration_fee: newKpis.reconsideration_fee ?? null,
-      hearing_fee: newKpis.hearing_fee ?? null,
-      appeals_council_fee: newKpis.appeals_council_fee ?? null,
-      federal_court_fee: newKpis.federal_court_fee ?? null,
-      application_win_rate: newKpis.application_win_rate ?? null,
-      reconsideration_win_rate: newKpis.reconsideration_win_rate ?? null,
-      hearing_win_rate: newKpis.hearing_win_rate ?? null,
-      appeals_council_win_rate: newKpis.appeals_council_win_rate ?? null,
-      federal_court_win_rate: newKpis.federal_court_win_rate ?? null,
-      updated_at: new Date().toISOString(),
-    };
+    const row = { user_id: user.id, updated_at: new Date().toISOString() };
+    for (const key of Object.keys(DEFAULT_KPIS)) {
+      const val = newKpis[key];
+      row[key] = (val === '' || val == null) ? null : val;
+    }
 
     const { error } = await supabase
       .from('user_kpis')

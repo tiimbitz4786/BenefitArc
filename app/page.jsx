@@ -189,7 +189,7 @@ export default function Home() {
               description="Set your firm's key performance indicators. These values serve as defaults across all BenefitArc tools."
               icon="⚙️" status="Live"
               gradient="linear-gradient(135deg, #10b981 0%, #6366f1 100%)"
-              features={['Fee Per Sign-Up', 'Win Rates', 'Fees Per Win', 'Closed No Fee %']}
+              features={['Fee Per Sign-Up', 'Win Rates', 'Fees Per Win', 'Adjudication Times', 'Payment Lag']}
               href="/kpi-settings"
             />
             <ToolCard

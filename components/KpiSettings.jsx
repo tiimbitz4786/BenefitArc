@@ -84,20 +84,22 @@ export default function KpiSettings() {
     setSaveMessage('');
 
     // Convert form values to proper types for storage
-    const cleanKpis = {
-      avg_fee_per_sign_up: form.avg_fee_per_sign_up === '' ? '' : parseFloat(form.avg_fee_per_sign_up) || '',
-      closed_no_fee_percent: form.closed_no_fee_percent === '' ? '' : parseFloat(form.closed_no_fee_percent) || '',
-      application_fee: parseFloat(form.application_fee) || DEFAULT_KPIS.application_fee,
-      reconsideration_fee: parseFloat(form.reconsideration_fee) || DEFAULT_KPIS.reconsideration_fee,
-      hearing_fee: parseFloat(form.hearing_fee) || DEFAULT_KPIS.hearing_fee,
-      appeals_council_fee: parseFloat(form.appeals_council_fee) || DEFAULT_KPIS.appeals_council_fee,
-      federal_court_fee: parseFloat(form.federal_court_fee) || DEFAULT_KPIS.federal_court_fee,
-      application_win_rate: parseFloat(form.application_win_rate) || DEFAULT_KPIS.application_win_rate,
-      reconsideration_win_rate: parseFloat(form.reconsideration_win_rate) || DEFAULT_KPIS.reconsideration_win_rate,
-      hearing_win_rate: parseFloat(form.hearing_win_rate) || DEFAULT_KPIS.hearing_win_rate,
-      appeals_council_win_rate: parseFloat(form.appeals_council_win_rate) || DEFAULT_KPIS.appeals_council_win_rate,
-      federal_court_win_rate: parseFloat(form.federal_court_win_rate) || DEFAULT_KPIS.federal_court_win_rate,
-    };
+    const cleanKpis = {};
+    for (const key of Object.keys(DEFAULT_KPIS)) {
+      const raw = form[key];
+      if (raw === '' || raw == null) {
+        cleanKpis[key] = DEFAULT_KPIS[key] === '' ? '' : (parseFloat(raw) || DEFAULT_KPIS[key]);
+      } else {
+        cleanKpis[key] = parseFloat(raw) || DEFAULT_KPIS[key];
+      }
+    }
+    // Preserve empty-string fields that are legitimately optional
+    for (const key of ['avg_fee_per_sign_up', 'closed_no_fee_percent',
+      'application_payment_lag_days', 'reconsideration_payment_lag_days',
+      'hearing_payment_lag_days', 'appeals_council_payment_lag_days',
+      'federal_court_payment_lag_days']) {
+      if (form[key] === '' || form[key] == null) cleanKpis[key] = '';
+    }
 
     const { error } = await saveKpis(cleanKpis);
     setSaving(false);
@@ -134,6 +136,24 @@ export default function KpiSettings() {
         hearing_win_rate: DEFAULT_KPIS.hearing_win_rate,
         appeals_council_win_rate: DEFAULT_KPIS.appeals_council_win_rate,
         federal_court_win_rate: DEFAULT_KPIS.federal_court_win_rate,
+      }));
+    } else if (section === 'adjtime') {
+      setForm(prev => ({
+        ...prev,
+        application_adj_months: DEFAULT_KPIS.application_adj_months,
+        reconsideration_adj_months: DEFAULT_KPIS.reconsideration_adj_months,
+        hearing_adj_months: DEFAULT_KPIS.hearing_adj_months,
+        appeals_council_adj_months: DEFAULT_KPIS.appeals_council_adj_months,
+        federal_court_adj_months: DEFAULT_KPIS.federal_court_adj_months,
+      }));
+    } else if (section === 'paylag') {
+      setForm(prev => ({
+        ...prev,
+        application_payment_lag_days: DEFAULT_KPIS.application_payment_lag_days,
+        reconsideration_payment_lag_days: DEFAULT_KPIS.reconsideration_payment_lag_days,
+        hearing_payment_lag_days: DEFAULT_KPIS.hearing_payment_lag_days,
+        appeals_council_payment_lag_days: DEFAULT_KPIS.appeals_council_payment_lag_days,
+        federal_court_payment_lag_days: DEFAULT_KPIS.federal_court_payment_lag_days,
       }));
     }
   };
@@ -361,6 +381,114 @@ export default function KpiSettings() {
                       style={{ ...inputStyle, paddingRight: '28px' }}
                     />
                     <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '14px' }}>%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 4: Average Adjudication Time by Stage */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(20, 20, 35, 0.9) 100%)',
+          borderRadius: '16px',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          padding: '24px',
+          marginBottom: '24px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+              Avg Adjudication Time by Stage
+            </h2>
+            <button
+              onClick={() => resetSection('adjtime')}
+              style={{
+                padding: '4px 12px', borderRadius: '6px',
+                background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)',
+                color: '#a5b4fc', fontSize: '11px', cursor: 'pointer',
+              }}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '20px' }}>
+            Time from entering a stage to receiving a decision, in months.
+            Defaults from SSA FY2024, AARP (Oct 2025), Atticus (June 2024).
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {STAGES.map(stage => {
+              const adjKey = `${stage.key}_adj_months`;
+              return (
+                <div key={stage.key}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: '500' }}>
+                    {stage.label}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={form[adjKey] ?? ''}
+                      onChange={(e) => handleChange(adjKey, e.target.value)}
+                      placeholder={DEFAULT_KPIS[adjKey].toString()}
+                      style={{ ...inputStyle, paddingRight: '56px' }}
+                    />
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '12px' }}>months</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 5: Payment Lag by Stage */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(20, 20, 35, 0.9) 100%)',
+          borderRadius: '16px',
+          border: '1px solid rgba(245, 158, 11, 0.2)',
+          padding: '24px',
+          marginBottom: '32px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+              Payment Lag by Stage
+            </h2>
+            <button
+              onClick={() => resetSection('paylag')}
+              style={{
+                padding: '4px 12px', borderRadius: '6px',
+                background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)',
+                color: '#a5b4fc', fontSize: '11px', cursor: 'pointer',
+              }}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+          <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '20px' }}>
+            Days from favorable decision to attorney fee payment. Enter based on your firm's
+            experience — there is no authoritative public data for this metric.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {STAGES.map(stage => {
+              const lagKey = `${stage.key}_payment_lag_days`;
+              return (
+                <div key={stage.key}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: '500' }}>
+                    {stage.label}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={form[lagKey] ?? ''}
+                      onChange={(e) => handleChange(lagKey, e.target.value)}
+                      placeholder="e.g. 75"
+                      style={{ ...inputStyle, paddingRight: '44px' }}
+                    />
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '12px' }}>days</span>
                   </div>
                 </div>
               );
