@@ -37,12 +37,15 @@ export const DEFAULT_KPIS = {
 
 export function KpiProvider({ children }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [kpis, setKpis] = useState(DEFAULT_KPIS);
   const [kpisLoading, setKpisLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const loadKpis = async () => {
-      if (!user) {
+      if (!userId) {
         setKpis(DEFAULT_KPIS);
         setKpisLoading(false);
         return;
@@ -53,8 +56,10 @@ export function KpiProvider({ children }) {
         const { data: kpiData, error: kpiError } = await supabase
           .from('user_kpis')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .single();
+
+        if (!mounted) return;
 
         if (kpiData && !kpiError) {
           const loaded = {};
@@ -70,8 +75,10 @@ export function KpiProvider({ children }) {
         const { data: feeData, error: feeError } = await supabase
           .from('user_fee_data')
           .select('application_fee, reconsideration_fee, hearing_fee, appeals_council_fee, federal_court_fee')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .single();
+
+        if (!mounted) return;
 
         if (feeData && !feeError) {
           setKpis({
@@ -86,15 +93,17 @@ export function KpiProvider({ children }) {
           setKpis(DEFAULT_KPIS);
         }
       } catch (err) {
-        setKpis(DEFAULT_KPIS);
+        if (mounted) setKpis(DEFAULT_KPIS);
       } finally {
-        setKpisLoading(false);
+        if (mounted) setKpisLoading(false);
       }
     };
 
     setKpisLoading(true);
     loadKpis();
-  }, [user]);
+
+    return () => { mounted = false; };
+  }, [userId]);
 
   const saveKpis = async (newKpis) => {
     if (!user) return { error: 'Not authenticated' };

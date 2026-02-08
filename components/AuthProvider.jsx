@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const AuthContext = createContext({});
@@ -11,7 +11,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const initialLoadDone = useRef(false);
 
   const fetchProfile = async (userId) => {
     try {
@@ -31,48 +30,55 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const getSession = async () => {
+    let mounted = true;
+
+    const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
         setUser(session?.user ?? null);
 
         if (session?.user) {
           await fetchProfile(session.user.id);
         }
       } catch (err) {
-        // Session retrieval failed silently
+        // Auth initialization failed
       } finally {
-        setLoading(false);
-        initialLoadDone.current = true;
+        if (mounted) setLoading(false);
       }
     };
 
-    getSession();
+    // Safety net: never show loading screen for more than 10 seconds
+    const timeout = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 10000);
+
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // Only show loading for real auth transitions, not token refreshes
-        const isAuthTransition = event === 'SIGNED_IN' || event === 'SIGNED_OUT';
+      async (_event, session) => {
+        if (!mounted) return;
 
+        // Silently sync user and profile — never touch loading state.
+        // Initial load is handled by init() above.
+        // Sign-in is handled by the signIn function below.
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          if (initialLoadDone.current && isAuthTransition) {
-            setLoading(true);
-          }
-          await fetchProfile(session.user.id);
+          fetchProfile(session.user.id); // fire-and-forget
         } else {
           setProfile(null);
-        }
-
-        if (initialLoadDone.current && isAuthTransition) {
-          setLoading(false);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []); // No dependencies - subscribe once
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signUp = async (email, password) => {
     const { data, error } = await supabase.auth.signUp({
