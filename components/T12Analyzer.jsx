@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 // XLSX is dynamically imported only when an Excel file is uploaded (see parseFile)
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
+import ExportToolbar from './ExportToolbar';
 
 // ============================================
 // BENEFITARC T12 P&L ANALYSIS
@@ -290,6 +291,8 @@ export default function T12Analyzer() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [textInput, setTextInput] = useState('');
   const [showTextInput, setShowTextInput] = useState(false);
+
+  const contentRef = useRef(null);
 
   // Saved categorization rules
   const [savedRules, setSavedRules] = useState({});
@@ -2022,9 +2025,16 @@ export default function T12Analyzer() {
 
   const barDataFiltered = useMemo(() => barData.filter(d => d.name !== 'Profit'), [barData]);
 
+  const t12ExcelData = useMemo(() => barData.map(row => ({
+    Category: row.name,
+    Amount: Math.round(row.amount),
+    '% of Revenue': `${row.pct.toFixed(1)}%`,
+    Benchmark: BENCHMARKS[row.name.toLowerCase()]?.description || '',
+  })), [barData]);
+
   const renderStep3 = () => {
     return (
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+      <div ref={contentRef} style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2043,7 +2053,14 @@ export default function T12Analyzer() {
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <ExportToolbar
+              contentRef={contentRef}
+              pdfFilename="BenefitArc-T12-Analysis"
+              excelData={t12ExcelData}
+              excelSheetName="T12 P&L"
+              excelFilename="BenefitArc-T12-PL-Data"
+            />
             <button
               onClick={clearAllData}
               style={{

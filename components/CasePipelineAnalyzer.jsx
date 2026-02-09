@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, FunnelChart, Funnel, LabelList } from 'recharts';
 import { useAuth } from './AuthProvider';
 import { useKpis, DEFAULT_KPIS } from './KpiProvider';
+import ExportToolbar from './ExportToolbar';
 import Link from 'next/link';
 
 // ============================================
@@ -192,6 +193,8 @@ export default function CasePipelineAnalyzer() {
   
   // Overall attrition rate (lost contact, death, return to work, etc.)
   const [attritionRate, setAttritionRate] = useState(10);
+
+  const contentRef = useRef(null);
 
   // ============================================
   // INITIALIZE FROM KPI CONTEXT
@@ -1415,15 +1418,37 @@ export default function CasePipelineAnalyzer() {
     color: s.color,
   })), [analysis.stageData]);
 
+  const pipelineExcelData = useMemo(() => analysis.stageData.map(s => ({
+    Stage: s.label,
+    Cases: s.caseCount,
+    'Win Rate': `${(s.winRate * 100).toFixed(0)}%`,
+    'Expected Wins': Math.round(s.expectedWins),
+    'Avg Fee': s.avgFee,
+    'Expected Revenue': Math.round(s.expectedRevenue),
+    'Months to Resolution': s.monthsToResolution,
+  })), [analysis.stageData]);
+
   const renderStep3 = () => {
     return (
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px', textAlign: 'center' }}>
-          Pipeline Analysis
-        </h2>
-        <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginBottom: '32px' }}>
-          Based on your case counts, average fees, and SSA 2024 win rate data
-        </p>
+      <div ref={contentRef} style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+          <div>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px' }}>
+              Pipeline Analysis
+            </h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '0' }}>
+              Based on your case counts, average fees, and SSA 2024 win rate data
+            </p>
+          </div>
+          <ExportToolbar
+            contentRef={contentRef}
+            pdfFilename="BenefitArc-Case-Pipeline-Analysis"
+            excelData={pipelineExcelData}
+            excelSheetName="Pipeline Data"
+            excelFilename="BenefitArc-Case-Pipeline-Data"
+          />
+        </div>
+        <div style={{ marginBottom: '32px' }} />
         
         {/* Summary Cards - Row 1: Key Metrics */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>

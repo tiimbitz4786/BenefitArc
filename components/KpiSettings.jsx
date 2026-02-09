@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useKpis, DEFAULT_KPIS } from './KpiProvider';
+import ExportToolbar from './ExportToolbar';
 import Link from 'next/link';
 
 const STAGES = [
@@ -65,6 +66,27 @@ export default function KpiSettings() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [initialized, setInitialized] = useState(false);
+  const contentRef = useRef(null);
+
+  const excelData = useMemo(() => {
+    const rows = [];
+    rows.push({ Section: 'Firm-Level', Label: 'Avg Fee Per Sign-Up ($)', Value: form.avg_fee_per_sign_up, Default: DEFAULT_KPIS.avg_fee_per_sign_up });
+    rows.push({ Section: 'Firm-Level', Label: 'Closed No Fee (%)', Value: form.closed_no_fee_percent, Default: DEFAULT_KPIS.closed_no_fee_percent });
+    STAGES.forEach(s => {
+      rows.push({ Section: 'Avg Fee Per Win', Label: s.label, Value: form[`${s.key}_fee`], Default: DEFAULT_KPIS[`${s.key}_fee`] });
+    });
+    STAGES.forEach(s => {
+      const rate = form[`${s.key}_win_rate`];
+      rows.push({ Section: 'Win Rate', Label: s.label, Value: rate !== '' && rate != null ? `${Math.round(parseFloat(rate) * 100)}%` : '', Default: `${Math.round(DEFAULT_KPIS[`${s.key}_win_rate`] * 100)}%` });
+    });
+    STAGES.forEach(s => {
+      rows.push({ Section: 'Adj Time (months)', Label: s.label, Value: form[`${s.key}_adj_months`], Default: DEFAULT_KPIS[`${s.key}_adj_months`] });
+    });
+    STAGES.forEach(s => {
+      rows.push({ Section: 'Payment Lag (days)', Label: s.label, Value: form[`${s.key}_payment_lag_days`], Default: DEFAULT_KPIS[`${s.key}_payment_lag_days`] });
+    });
+    return rows;
+  }, [form]);
 
   // Initialize form from context once loaded
   useEffect(() => {
@@ -194,7 +216,7 @@ export default function KpiSettings() {
         background: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%)', pointerEvents: 'none',
       }} />
 
-      <div style={{ position: 'relative', zIndex: 1, padding: '40px 24px', maxWidth: '800px', margin: '0 auto' }}>
+      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, padding: '40px 24px', maxWidth: '800px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ filter: 'drop-shadow(0 0 30px rgba(16, 185, 129, 0.4))', marginBottom: '16px' }}>
@@ -517,6 +539,17 @@ export default function KpiSettings() {
           >
             {saving ? 'Saving...' : 'Save KPI Settings'}
           </button>
+        </div>
+
+        {/* Export Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+          <ExportToolbar
+            contentRef={contentRef}
+            pdfFilename="BenefitArc-KPI-Settings"
+            excelData={excelData}
+            excelSheetName="KPI Settings"
+            excelFilename="BenefitArc-KPI-Settings"
+          />
         </div>
 
         {/* Save message */}

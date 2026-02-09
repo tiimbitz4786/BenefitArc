@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Area, Cell, PieChart, Pie } from 'recharts';
 import { useKpis } from './KpiProvider';
+import ExportToolbar from './ExportToolbar';
 
 // ============================================
 // REVENUE FORECAST MODEL - SETUP WIZARD v2
@@ -38,6 +39,7 @@ export default function RevenueForecastSetup() {
   const { kpis, kpisLoading } = useKpis();
   const [step, setStep] = useState(0); // 0 = welcome/security, 1-4 = data entry, 5 = results
   const [dataConfirmed, setDataConfirmed] = useState(false);
+  const contentRef = useRef(null);
   const [firmData, setFirmData] = useState({
     firmName: '',
     // Revenue by level by year
@@ -359,7 +361,15 @@ export default function RevenueForecastSetup() {
     
     return results;
   }, [firmData, calculatedMetrics]);
-  
+
+  const forecastExcelData = useMemo(() => projections.map(p => ({
+    Year: p.year,
+    Intake: p.intake,
+    'Weighted Source': p.weightedIntake,
+    Revenue: Math.round(p.revenue),
+    '% Steady': `${p.pctSteady}%`,
+  })), [projections]);
+
   const formatCurrency = (v) => {
     if (v === 0 || !v) return '$0';
     if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`;
@@ -1189,7 +1199,7 @@ export default function RevenueForecastSetup() {
 
   const renderStep5 = () => {
     return (
-      <div>
+      <div ref={contentRef}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1209,6 +1219,13 @@ export default function RevenueForecastSetup() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <ExportToolbar
+              contentRef={contentRef}
+              pdfFilename="BenefitArc-Steady-State-Projection"
+              excelData={forecastExcelData}
+              excelSheetName="Forecast"
+              excelFilename="BenefitArc-Steady-State-Forecast"
+            />
             <button
               onClick={() => {
                 if (confirm('Clear all data and start over?')) {
