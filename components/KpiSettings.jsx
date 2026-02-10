@@ -13,6 +13,8 @@ const STAGES = [
   { key: 'federal_court', label: 'Federal Court' },
 ];
 
+const STAGES_WITH_EAJA = [...STAGES, { key: 'eaja', label: 'EAJA' }];
+
 const inputStyle = {
   width: '100%',
   padding: '10px 14px',
@@ -72,17 +74,17 @@ export default function KpiSettings() {
     const rows = [];
     rows.push({ Section: 'Firm-Level', Label: 'Avg Fee Per Sign-Up ($)', Value: form.avg_fee_per_sign_up, Default: DEFAULT_KPIS.avg_fee_per_sign_up });
     rows.push({ Section: 'Firm-Level', Label: 'Closed No Fee (%)', Value: form.closed_no_fee_percent, Default: DEFAULT_KPIS.closed_no_fee_percent });
-    STAGES.forEach(s => {
+    STAGES_WITH_EAJA.forEach(s => {
       rows.push({ Section: 'Avg Fee Per Win', Label: s.label, Value: form[`${s.key}_fee`], Default: DEFAULT_KPIS[`${s.key}_fee`] });
     });
     STAGES.forEach(s => {
       const rate = form[`${s.key}_win_rate`];
       rows.push({ Section: 'Win Rate', Label: s.label, Value: rate !== '' && rate != null ? `${Math.round(parseFloat(rate) * 100)}%` : '', Default: `${Math.round(DEFAULT_KPIS[`${s.key}_win_rate`] * 100)}%` });
     });
-    STAGES.forEach(s => {
+    STAGES_WITH_EAJA.forEach(s => {
       rows.push({ Section: 'Adj Time (months)', Label: s.label, Value: form[`${s.key}_adj_months`], Default: DEFAULT_KPIS[`${s.key}_adj_months`] });
     });
-    STAGES.forEach(s => {
+    STAGES_WITH_EAJA.forEach(s => {
       rows.push({ Section: 'Payment Lag (days)', Label: s.label, Value: form[`${s.key}_payment_lag_days`], Default: DEFAULT_KPIS[`${s.key}_payment_lag_days`] });
     });
     return rows;
@@ -119,7 +121,7 @@ export default function KpiSettings() {
     for (const key of ['avg_fee_per_sign_up', 'closed_no_fee_percent',
       'application_payment_lag_days', 'reconsideration_payment_lag_days',
       'hearing_payment_lag_days', 'appeals_council_payment_lag_days',
-      'federal_court_payment_lag_days']) {
+      'federal_court_payment_lag_days', 'eaja_payment_lag_days']) {
       if (form[key] === '' || form[key] == null) cleanKpis[key] = '';
     }
 
@@ -149,6 +151,7 @@ export default function KpiSettings() {
         hearing_fee: DEFAULT_KPIS.hearing_fee,
         appeals_council_fee: DEFAULT_KPIS.appeals_council_fee,
         federal_court_fee: DEFAULT_KPIS.federal_court_fee,
+        eaja_fee: DEFAULT_KPIS.eaja_fee,
       }));
     } else if (section === 'winrates') {
       setForm(prev => ({
@@ -167,6 +170,7 @@ export default function KpiSettings() {
         hearing_adj_months: DEFAULT_KPIS.hearing_adj_months,
         appeals_council_adj_months: DEFAULT_KPIS.appeals_council_adj_months,
         federal_court_adj_months: DEFAULT_KPIS.federal_court_adj_months,
+        eaja_adj_months: DEFAULT_KPIS.eaja_adj_months,
       }));
     } else if (section === 'paylag') {
       setForm(prev => ({
@@ -176,6 +180,7 @@ export default function KpiSettings() {
         hearing_payment_lag_days: DEFAULT_KPIS.hearing_payment_lag_days,
         appeals_council_payment_lag_days: DEFAULT_KPIS.appeals_council_payment_lag_days,
         federal_court_payment_lag_days: DEFAULT_KPIS.federal_court_payment_lag_days,
+        eaja_payment_lag_days: DEFAULT_KPIS.eaja_payment_lag_days,
       }));
     }
   };
@@ -244,6 +249,12 @@ export default function KpiSettings() {
           <strong>Tip:</strong> Avg Fee Per Sign-Up = Avg Fee Per Win × (1 − Closed No Fee %).
           Values you set here will auto-populate as defaults in Case Pipeline Analyzer and Steady State Projection,
           but remain editable within each tool.
+          <span style={{ display: 'block', marginTop: '8px' }}>
+            Need help understanding these metrics? See the{' '}
+            <Link href="/glossary" style={{ color: '#6ee7b7', fontWeight: '600', textDecoration: 'underline' }}>
+              KPI Glossary
+            </Link>.
+          </span>
         </div>
 
         {/* Section 1: Firm-Level KPIs */}
@@ -330,7 +341,7 @@ export default function KpiSettings() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {STAGES.map(stage => (
+            {STAGES_WITH_EAJA.map(stage => (
               <div key={stage.key}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: '500' }}>
                   {stage.label}
@@ -439,7 +450,7 @@ export default function KpiSettings() {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {STAGES.map(stage => {
+            {STAGES_WITH_EAJA.map(stage => {
               const adjKey = `${stage.key}_adj_months`;
               return (
                 <div key={stage.key}>
@@ -493,7 +504,7 @@ export default function KpiSettings() {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {STAGES.map(stage => {
+            {STAGES_WITH_EAJA.map(stage => {
               const lagKey = `${stage.key}_payment_lag_days`;
               return (
                 <div key={stage.key}>

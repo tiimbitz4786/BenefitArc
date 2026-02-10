@@ -33,6 +33,10 @@ export const DEFAULT_KPIS = {
   hearing_payment_lag_days: '',
   appeals_council_payment_lag_days: '',
   federal_court_payment_lag_days: '',
+  // EAJA (Equal Access to Justice Act) fee — separate from case outcome win rates
+  eaja_fee: 6500,
+  eaja_adj_months: 6,
+  eaja_payment_lag_days: '',
 };
 
 export function KpiProvider({ children }) {
@@ -118,11 +122,25 @@ export function KpiProvider({ children }) {
       .from('user_kpis')
       .upsert(row, { onConflict: 'user_id' });
 
-    if (!error) {
-      setKpis(newKpis);
+    if (error) {
+      // Retry without EAJA columns in case they haven't been added to the DB yet
+      const EAJA_FIELDS = ['eaja_fee', 'eaja_adj_months', 'eaja_payment_lag_days'];
+      const rowWithoutEaja = { ...row };
+      EAJA_FIELDS.forEach(f => delete rowWithoutEaja[f]);
+
+      const { error: retryError } = await supabase
+        .from('user_kpis')
+        .upsert(rowWithoutEaja, { onConflict: 'user_id' });
+
+      if (!retryError) {
+        setKpis(newKpis);
+        return { error: null };
+      }
+      return { error: retryError };
     }
 
-    return { error };
+    setKpis(newKpis);
+    return { error: null };
   };
 
   return (

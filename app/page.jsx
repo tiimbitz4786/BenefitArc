@@ -213,6 +213,20 @@ export default function Home() {
               features={['Pipeline Valuation', 'Stage Analysis', 'Revenue Projections', 'Saved Fee Data']}
               href="/case-pipeline"
             />
+            <ToolCard
+              title="KPI Glossary"
+              description="Definitions, default values, and data sources for every KPI metric used across BenefitArc tools. Searchable and exportable."
+              icon="📖" status="Live" gradient="linear-gradient(135deg, #f59e0b 0%, #eab308 100%)"
+              features={['Definitions', 'Default Values', 'Data Sources', 'Searchable', 'Export']}
+              href="/glossary"
+            />
+            <ToolCard
+              title="Monte Carlo Forecaster"
+              description="Upload your case pipeline and run thousands of Monte Carlo simulations to forecast expected revenue with P10/P50/P90 confidence intervals."
+              icon="🎲" status="Live" gradient="linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)"
+              features={['File Upload', 'PDF OCR', 'Monte Carlo Simulation', 'Confidence Intervals', 'Revenue Timeline']}
+              href="/monte-carlo"
+            />
           </div>
           
           <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '24px', marginTop: '48px' }}>
