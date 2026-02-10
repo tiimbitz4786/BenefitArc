@@ -69,24 +69,6 @@ const ToolCard = ({ title, description, icon, status, href, gradient, features }
   </Link>
 );
 
-const ComingSoonCard = ({ title, description }) => (
-  <div style={{
-    background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.6) 0%, rgba(20, 20, 35, 0.5) 100%)',
-    borderRadius: '20px', border: '1px dashed rgba(99, 102, 241, 0.2)', padding: '28px', opacity: 0.7,
-  }}>
-    <div style={{
-      width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(99, 102, 241, 0.1)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', marginBottom: '20px',
-    }}>🔮</div>
-    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>{title}</h3>
-    <p style={{ fontSize: '12px', color: '#475569', lineHeight: '1.5' }}>{description}</p>
-    <div style={{
-      marginTop: '16px', padding: '6px 12px', borderRadius: '6px',
-      background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', fontSize: '11px', fontWeight: '500', display: 'inline-block',
-    }}>Coming Soon</div>
-  </div>
-);
-
 export default function Home() {
   const { user, loading, signOut, isApproved, isAdmin } = useAuth();
 
@@ -146,6 +128,17 @@ export default function Home() {
             ADMIN
           </span>
         )}
+        <Link
+          href="/glossary"
+          style={{
+            padding: '6px 12px', borderRadius: '8px',
+            background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#f59e0b', fontSize: '12px', fontWeight: '500',
+            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+          }}
+        >
+          📖 Glossary
+        </Link>
         <button
           onClick={() => signOut()}
           style={{
@@ -214,13 +207,6 @@ export default function Home() {
               href="/case-pipeline"
             />
             <ToolCard
-              title="KPI Glossary"
-              description="Definitions, default values, and data sources for every KPI metric used across BenefitArc tools. Searchable and exportable."
-              icon="📖" status="Live" gradient="linear-gradient(135deg, #f59e0b 0%, #eab308 100%)"
-              features={['Definitions', 'Default Values', 'Data Sources', 'Searchable', 'Export']}
-              href="/glossary"
-            />
-            <ToolCard
               title="Monte Carlo Forecaster"
               description="Upload your case pipeline and run thousands of Monte Carlo simulations to forecast expected revenue with P10/P50/P90 confidence intervals."
               icon="🎲" status="Live" gradient="linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)"
@@ -229,13 +215,6 @@ export default function Home() {
             />
           </div>
           
-          <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '24px', marginTop: '48px' }}>
-            Coming Soon
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-            <ComingSoonCard title="Marketing ROI Calculator" description="Measure marketing effectiveness by channel and calculate true cost per signed case." />
-            <ComingSoonCard title="Staffing Optimizer" description="Model optimal staffing levels based on caseload, case mix, and productivity targets." />
-          </div>
         </section>
         
         <footer style={{ marginTop: '80px', paddingTop: '32px', borderTop: '1px solid rgba(99, 102, 241, 0.1)', textAlign: 'center' }}>
