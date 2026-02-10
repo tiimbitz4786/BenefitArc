@@ -213,6 +213,13 @@ export default function Home() {
               features={['File Upload', 'PDF OCR', 'Monte Carlo Simulation', 'Confidence Intervals', 'Revenue Timeline']}
               href="/monte-carlo"
             />
+            <ToolCard
+              title="Marketing ROI Calculator"
+              description="Track marketing campaign performance and calculate cost per lead, cost per wanted, and cost per signed across all your campaigns."
+              icon="📣" status="Live" gradient="linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)"
+              features={['Campaign Tracking', 'Cost Per Lead', 'Cost Per Wanted', 'Cost Per Signed', 'Export']}
+              href="/marketing-roi"
+            />
           </div>
           
         </section>
