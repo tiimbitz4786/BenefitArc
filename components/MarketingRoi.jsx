@@ -83,6 +83,18 @@ function costPer(spend, count) {
   return s / c;
 }
 
+function ratePct(numerator, denominator) {
+  const n = parseFloat(numerator);
+  const d = parseFloat(denominator);
+  if (isNaN(n) || isNaN(d) || d === 0) return null;
+  return (n / d) * 100;
+}
+
+function formatPct(val) {
+  if (val == null || !isFinite(val)) return '—';
+  return val.toFixed(1) + '%';
+}
+
 export default function MarketingRoi() {
   const [campaigns, setCampaigns] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -206,6 +218,9 @@ export default function MarketingRoi() {
       'Cost Per Lead': costPer(c.spend, c.leads) ?? '',
       'Cost Per Wanted': costPer(c.spend, c.wanted) ?? '',
       'Cost Per Signed': costPer(c.spend, c.signed) ?? '',
+      'Wanted Rate (%)': ratePct(c.wanted, c.leads) != null ? ratePct(c.wanted, c.leads).toFixed(1) : '',
+      'Conversion Rate (%)': ratePct(c.signed, c.signed + c.wanted) != null ? ratePct(c.signed, c.signed + c.wanted).toFixed(1) : '',
+      'Sign Rate (%)': ratePct(c.signed, c.leads) != null ? ratePct(c.signed, c.leads).toFixed(1) : '',
     }));
   }, [campaigns]);
 
@@ -284,7 +299,7 @@ export default function MarketingRoi() {
         background: 'radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%)', pointerEvents: 'none',
       }} />
 
-      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, padding: '40px 24px', maxWidth: '1100px', margin: '0 auto' }}>
+      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, padding: '40px 24px', maxWidth: '1300px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ filter: 'drop-shadow(0 0 30px rgba(20, 184, 166, 0.4))', marginBottom: '16px' }}>
@@ -465,6 +480,9 @@ export default function MarketingRoi() {
                   <th style={{ ...thStyle, textAlign: 'right' }}>CPL</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>CPW</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>CPS</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Wanted %</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Conv %</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Sign %</th>
                   <th style={{ ...thStyle, textAlign: 'center' }}></th>
                 </tr>
               </thead>
@@ -501,6 +519,15 @@ export default function MarketingRoi() {
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#2dd4bf' }}>
                       {formatCurrency(costPer(c.spend, c.signed))}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#a5b4fc' }}>
+                      {formatPct(ratePct(c.wanted, c.leads))}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#c4b5fd' }}>
+                      {formatPct(ratePct(c.signed, c.signed + c.wanted))}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#fbbf24' }}>
+                      {formatPct(ratePct(c.signed, c.leads))}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <button
@@ -542,6 +569,9 @@ export default function MarketingRoi() {
               { label: 'Blended CPL', value: formatCurrency(costPer(totals.spend, totals.leads)), color: '#5eead4' },
               { label: 'Blended CPW', value: formatCurrency(costPer(totals.spend, totals.wanted)), color: '#67e8f9' },
               { label: 'Blended CPS', value: formatCurrency(costPer(totals.spend, totals.signed)), color: '#2dd4bf' },
+              { label: 'Wanted Rate', value: formatPct(ratePct(totals.wanted, totals.leads)), color: '#a5b4fc' },
+              { label: 'Conversion Rate', value: formatPct(ratePct(totals.signed, totals.signed + totals.wanted)), color: '#c4b5fd' },
+              { label: 'Sign Rate', value: formatPct(ratePct(totals.signed, totals.leads)), color: '#fbbf24' },
             ].map((card, idx) => (
               <div key={idx} style={{
                 background: 'linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(20, 20, 35, 0.9) 100%)',
