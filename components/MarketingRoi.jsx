@@ -2,7 +2,9 @@
 
 import React, { useState, useRef, useMemo, useCallback } from 'react';
 import ExportToolbar from './ExportToolbar';
-import Link from 'next/link';
+import ScenarioSelector from './ScenarioSelector';
+import useSavedScenarios from '@/hooks/useSavedScenarios';
+import { useDemo, DEMO_DATA } from './DemoProvider';
 
 function BenefitArcLogo({ size = 72 }) {
   return (
@@ -102,6 +104,21 @@ export default function MarketingRoi() {
   const [editingCell, setEditingCell] = useState(null); // { rowIdx, field }
   const [editValue, setEditValue] = useState('');
   const contentRef = useRef(null);
+
+  const { isDemoMode } = useDemo();
+  const scenarioHook = useSavedScenarios('marketing-roi');
+  const getDataToSave = () => ({ campaigns });
+  const handleLoadScenario = async (id) => {
+    const s = await scenarioHook.loadScenario(id);
+    if (s?.data?.campaigns) setCampaigns(s.data.campaigns);
+  };
+
+  // Pre-populate demo data
+  React.useEffect(() => {
+    if (isDemoMode && campaigns.length === 0) {
+      setCampaigns(DEMO_DATA.campaigns);
+    }
+  }, [isDemoMode]);
 
   const validate = useCallback(() => {
     const errs = {};
@@ -593,7 +610,16 @@ export default function MarketingRoi() {
 
         {/* Export Toolbar */}
         {campaigns.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+            <ScenarioSelector
+              scenarios={scenarioHook.scenarios}
+              activeId={scenarioHook.activeId}
+              loading={scenarioHook.loading}
+              onSave={(name, data) => scenarioHook.saveScenario(name, data)}
+              onLoad={handleLoadScenario}
+              onDelete={scenarioHook.deleteScenario}
+              getDataToSave={getDataToSave}
+            />
             <ExportToolbar
               contentRef={contentRef}
               pdfFilename="BenefitArc-Marketing-ROI"
@@ -604,20 +630,8 @@ export default function MarketingRoi() {
           </div>
         )}
 
-        {/* Footer */}
-        <div style={{ marginTop: '48px', textAlign: 'center' }}>
-          <Link
-            href="/"
-            style={{
-              color: '#14b8a6',
-              fontSize: '13px',
-              textDecoration: 'none',
-              fontWeight: '500',
-            }}
-          >
-            ← Back to Tools
-          </Link>
-        </div>
+        {/* Footer spacer */}
+        <div style={{ marginTop: '48px' }} />
       </div>
     </div>
   );

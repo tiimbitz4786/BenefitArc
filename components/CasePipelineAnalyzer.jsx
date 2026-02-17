@@ -5,6 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieCha
 import { useAuth } from './AuthProvider';
 import { useKpis, DEFAULT_KPIS } from './KpiProvider';
 import ExportToolbar from './ExportToolbar';
+import ScenarioSelector from './ScenarioSelector';
+import useSavedScenarios from '@/hooks/useSavedScenarios';
+import { useDemo, DEMO_DATA } from './DemoProvider';
 import Link from 'next/link';
 
 // ============================================
@@ -195,6 +198,37 @@ export default function CasePipelineAnalyzer() {
   const [attritionRate, setAttritionRate] = useState(10);
 
   const contentRef = useRef(null);
+
+  const { isDemoMode } = useDemo();
+  const scenarioHook = useSavedScenarios('case-pipeline');
+  const getDataToSave = () => ({
+    fees, pipeline, winRates, appealRates, attritionRate, step,
+  });
+  const handleLoadScenario = async (id) => {
+    const s = await scenarioHook.loadScenario(id);
+    if (s?.data) {
+      const d = s.data;
+      if (d.fees) setFees(d.fees);
+      if (d.pipeline) setPipeline(d.pipeline);
+      if (d.winRates) setWinRates(d.winRates);
+      if (d.appealRates) setAppealRates(d.appealRates);
+      if (d.attritionRate != null) setAttritionRate(d.attritionRate);
+      if (d.step != null) setStep(d.step);
+    }
+  };
+
+  // Pre-populate demo data
+  useEffect(() => {
+    if (isDemoMode && pipeline.application === '') {
+      const d = DEMO_DATA.pipeline;
+      setFees(d.fees);
+      setPipeline(d.pipeline);
+      setWinRates(d.winRates);
+      setAppealRates(d.appealRates);
+      setAttritionRate(d.attritionRate);
+      setStep(3); // jump to results
+    }
+  }, [isDemoMode]);
 
   // ============================================
   // INITIALIZE FROM KPI CONTEXT
@@ -1440,13 +1474,24 @@ export default function CasePipelineAnalyzer() {
               Based on your case counts, average fees, and SSA 2024 win rate data
             </p>
           </div>
-          <ExportToolbar
-            contentRef={contentRef}
-            pdfFilename="BenefitArc-Case-Pipeline-Analysis"
-            excelData={pipelineExcelData}
-            excelSheetName="Pipeline Data"
-            excelFilename="BenefitArc-Case-Pipeline-Data"
-          />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <ScenarioSelector
+              scenarios={scenarioHook.scenarios}
+              activeId={scenarioHook.activeId}
+              loading={scenarioHook.loading}
+              onSave={(name, data) => scenarioHook.saveScenario(name, data)}
+              onLoad={handleLoadScenario}
+              onDelete={scenarioHook.deleteScenario}
+              getDataToSave={getDataToSave}
+            />
+            <ExportToolbar
+              contentRef={contentRef}
+              pdfFilename="BenefitArc-Case-Pipeline-Analysis"
+              excelData={pipelineExcelData}
+              excelSheetName="Pipeline Data"
+              excelFilename="BenefitArc-Case-Pipeline-Data"
+            />
+          </div>
         </div>
         <div style={{ marginBottom: '32px' }} />
         

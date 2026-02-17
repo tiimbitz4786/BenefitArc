@@ -4,6 +4,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
 import ExportToolbar from './ExportToolbar';
+import ScenarioSelector from './ScenarioSelector';
+import useSavedScenarios from '@/hooks/useSavedScenarios';
 
 // ============================================
 // BENEFITARC T12 P&L ANALYSIS
@@ -293,6 +295,21 @@ export default function T12Analyzer() {
   const [showTextInput, setShowTextInput] = useState(false);
 
   const contentRef = useRef(null);
+
+  const scenarioHook = useSavedScenarios('t12-analysis');
+  const getDataToSave = () => ({
+    categorizedItems, totalRevenue, totalFirmRevenue, ssRevenuePercent,
+  });
+  const handleLoadScenario = async (id) => {
+    const s = await scenarioHook.loadScenario(id);
+    if (s?.data) {
+      if (s.data.categorizedItems) setCategorizedItems(s.data.categorizedItems);
+      if (s.data.totalRevenue != null) setTotalRevenue(s.data.totalRevenue);
+      if (s.data.totalFirmRevenue != null) setTotalFirmRevenue(s.data.totalFirmRevenue);
+      if (s.data.ssRevenuePercent != null) setSsRevenuePercent(s.data.ssRevenuePercent);
+      setStep(3); // go to results
+    }
+  };
 
   // Saved categorization rules
   const [savedRules, setSavedRules] = useState({});
@@ -2054,6 +2071,15 @@ export default function T12Analyzer() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <ScenarioSelector
+              scenarios={scenarioHook.scenarios}
+              activeId={scenarioHook.activeId}
+              loading={scenarioHook.loading}
+              onSave={(name, data) => scenarioHook.saveScenario(name, data)}
+              onLoad={handleLoadScenario}
+              onDelete={scenarioHook.deleteScenario}
+              getDataToSave={getDataToSave}
+            />
             <ExportToolbar
               contentRef={contentRef}
               pdfFilename="BenefitArc-T12-Analysis"

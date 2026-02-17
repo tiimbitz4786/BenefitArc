@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from './AuthProvider';
+import { useDemo } from './DemoProvider';
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [pendingApproval, setPendingApproval] = useState(false);
 
   const { signIn, signUp, isApproved } = useAuth();
+  const { enterDemoMode } = useDemo();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -245,6 +247,26 @@ export default function LoginPage() {
             {loading ? 'Please wait...' : (isSignUp ? 'Request Access' : 'Sign In')}
           </button>
         </form>
+
+        {/* Demo Mode Button */}
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button
+            onClick={enterDemoMode}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              background: 'rgba(245, 158, 11, 0.08)',
+              color: '#f59e0b',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Try Demo -- No Account Needed
+          </button>
+        </div>
 
         {/* Footer */}
         <p style={{

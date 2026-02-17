@@ -22,4 +22,6 @@ body {
 @media print {
   body { background: white !important; color: black !important; }
   .no-print { display: none !important; }
+  .sidebar-container { display: none !important; }
+  main { margin-left: 0 !important; }
 }

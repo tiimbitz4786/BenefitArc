@@ -2,6 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Area, Cell, PieChart, Pie } from 'recharts';
 import { useKpis } from './KpiProvider';
 import ExportToolbar from './ExportToolbar';
+import ScenarioSelector from './ScenarioSelector';
+import useSavedScenarios from '@/hooks/useSavedScenarios';
+import { useDemo, DEMO_DATA } from './DemoProvider';
 
 // ============================================
 // REVENUE FORECAST MODEL - SETUP WIZARD v2
@@ -80,6 +83,30 @@ export default function RevenueForecastSetup() {
     },
   });
   
+  const { isDemoMode } = useDemo();
+  const scenarioHook = useSavedScenarios('steady-state');
+  const getDataToSave = () => ({ firmData, step });
+  const handleLoadScenario = async (id) => {
+    const s = await scenarioHook.loadScenario(id);
+    if (s?.data) {
+      if (s.data.firmData) setFirmData(s.data.firmData);
+      if (s.data.step != null) setStep(s.data.step);
+    }
+  };
+
+  // Pre-populate demo data
+  useEffect(() => {
+    if (isDemoMode && firmData.firmName === '') {
+      const d = DEMO_DATA.steadyState;
+      setFirmData(prev => ({
+        ...prev,
+        firmName: d.firmName,
+        closedNoFeePercent: d.closedNoFeePercent,
+        recentMonthlyIntake: d.recentMonthlyIntake,
+      }));
+    }
+  }, [isDemoMode]);
+
   // Pre-populate closedNoFeePercent from KPI Settings if user hasn't entered one
   useEffect(() => {
     if (kpisLoading) return;
@@ -1219,6 +1246,15 @@ export default function RevenueForecastSetup() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <ScenarioSelector
+              scenarios={scenarioHook.scenarios}
+              activeId={scenarioHook.activeId}
+              loading={scenarioHook.loading}
+              onSave={(name, data) => scenarioHook.saveScenario(name, data)}
+              onLoad={handleLoadScenario}
+              onDelete={scenarioHook.deleteScenario}
+              getDataToSave={getDataToSave}
+            />
             <ExportToolbar
               contentRef={contentRef}
               pdfFilename="BenefitArc-Steady-State-Projection"

@@ -10,34 +10,6 @@ export default function SteadyStateWhitePaper() {
       color: '#f1f5f9',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }}>
-      {/* Back Navigation */}
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        left: '20px',
-        zIndex: 1000,
-      }}>
-        <Link 
-          href="/steady-state"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            background: 'rgba(15, 15, 25, 0.9)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            color: '#6366f1',
-            fontSize: '13px',
-            fontWeight: '500',
-            textDecoration: 'none',
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          ← Back to Tool
-        </Link>
-      </div>
-
       {/* Content */}
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '80px 24px 60px' }}>
         

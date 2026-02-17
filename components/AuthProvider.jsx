@@ -2,12 +2,25 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useDemo } from './DemoProvider';
 
 const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
+const DEMO_USER = {
+  id: 'demo-user-id',
+  email: 'demo@benefitarc.com',
+};
+
+const DEMO_PROFILE = {
+  is_approved: true,
+  is_admin: false,
+  onboarding_completed: true,
+};
+
 export function AuthProvider({ children }) {
+  const { isDemoMode } = useDemo();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +29,7 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('is_approved, is_admin')
+        .select('is_approved, is_admin, onboarding_completed')
         .eq('id', userId)
         .single();
 
@@ -30,6 +43,14 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
+    // If demo mode, set synthetic user immediately
+    if (isDemoMode) {
+      setUser(DEMO_USER);
+      setProfile(DEMO_PROFILE);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     const init = async () => {
@@ -49,7 +70,6 @@ export function AuthProvider({ children }) {
       }
     };
 
-    // Safety net: never show loading screen for more than 10 seconds
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false);
     }, 10000);
@@ -60,13 +80,10 @@ export function AuthProvider({ children }) {
       async (_event, session) => {
         if (!mounted) return;
 
-        // Silently sync user and profile — never touch loading state.
-        // Initial load is handled by init() above.
-        // Sign-in is handled by the signIn function below.
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          fetchProfile(session.user.id); // fire-and-forget
+          fetchProfile(session.user.id);
         } else {
           setProfile(null);
         }
@@ -78,26 +95,18 @@ export function AuthProvider({ children }) {
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isDemoMode]);
 
   const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     return { data, error };
   };
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data?.user) {
       await fetchProfile(data.user.id);
     }
-
     return { data, error };
   };
 
@@ -109,6 +118,7 @@ export function AuthProvider({ children }) {
 
   const isApproved = profile?.is_approved || false;
   const isAdmin = profile?.is_admin || false;
+  const onboardingCompleted = profile?.onboarding_completed || false;
 
   return (
     <AuthContext.Provider value={{
@@ -120,6 +130,7 @@ export function AuthProvider({ children }) {
       signOut,
       isApproved,
       isAdmin,
+      onboardingCompleted,
     }}>
       {children}
     </AuthContext.Provider>

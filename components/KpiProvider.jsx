@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthProvider';
+import { useDemo, DEMO_DATA } from './DemoProvider';
 
 const KpiContext = createContext({});
 
@@ -41,11 +42,19 @@ export const DEFAULT_KPIS = {
 
 export function KpiProvider({ children }) {
   const { user } = useAuth();
+  const { isDemoMode } = useDemo();
   const userId = user?.id;
   const [kpis, setKpis] = useState(DEFAULT_KPIS);
   const [kpisLoading, setKpisLoading] = useState(true);
 
   useEffect(() => {
+    // In demo mode, use demo KPIs immediately
+    if (isDemoMode) {
+      setKpis(DEMO_DATA.kpis);
+      setKpisLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     const loadKpis = async () => {
@@ -110,6 +119,10 @@ export function KpiProvider({ children }) {
   }, [userId]);
 
   const saveKpis = async (newKpis) => {
+    if (isDemoMode) {
+      setKpis(newKpis);
+      return { error: null };
+    }
     if (!user) return { error: 'Not authenticated' };
 
     const row = { user_id: user.id, updated_at: new Date().toISOString() };

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { exportToPdf, handlePrint, exportToExcel } from '@/lib/exportUtils';
+import { useFirmSettings } from './FirmSettingsProvider';
 
 export default function ExportToolbar({
   contentRef,
@@ -11,15 +12,20 @@ export default function ExportToolbar({
   excelFilename = 'report',
 }) {
   const [generating, setGenerating] = useState(false);
+  const { firmSettings } = useFirmSettings();
+
+  const brandingOptions = (firmSettings?.firm_name || firmSettings?.logo_base64)
+    ? { firmName: firmSettings.firm_name, logoBase64: firmSettings.logo_base64 }
+    : undefined;
 
   const onPrint = () => {
-    handlePrint(contentRef?.current);
+    handlePrint(contentRef?.current, brandingOptions);
   };
 
   const onPdf = async () => {
     setGenerating(true);
     try {
-      await exportToPdf(contentRef?.current, pdfFilename);
+      await exportToPdf(contentRef?.current, pdfFilename, brandingOptions);
     } finally {
       setGenerating(false);
     }
@@ -47,7 +53,7 @@ export default function ExportToolbar({
   return (
     <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       <button onClick={onPrint} style={buttonStyle} title="Print">
-        🖨️ Print
+        Print
       </button>
       <button
         onClick={onPdf}
@@ -59,11 +65,11 @@ export default function ExportToolbar({
         }}
         title="Download PDF"
       >
-        📄 {generating ? 'Generating...' : 'PDF'}
+        {generating ? 'Generating...' : 'PDF'}
       </button>
       {excelData && excelData.length > 0 && (
         <button onClick={onExcel} style={buttonStyle} title="Download Excel">
-          📊 Excel
+          Excel
         </button>
       )}
     </div>

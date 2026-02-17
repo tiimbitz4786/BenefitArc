@@ -4,6 +4,9 @@ import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, Cell } from 'recharts';
 import { useKpis, DEFAULT_KPIS } from './KpiProvider';
 import ExportToolbar from './ExportToolbar';
+import ScenarioSelector from './ScenarioSelector';
+import useSavedScenarios from '@/hooks/useSavedScenarios';
+import { useDemo } from './DemoProvider';
 import * as pdfjsLib from 'pdfjs-dist';
 import Tesseract from 'tesseract.js';
 
@@ -284,6 +287,23 @@ export default function MonteCarloForecaster() {
   const contentRef = useRef(null);
   const fileInputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+
+  const { isDemoMode } = useDemo();
+  const scenarioHook = useSavedScenarios('monte-carlo');
+  const getDataToSave = () => ({
+    numSims, feeVariance, winRateVariance, simKpis,
+    results: results ? { summary: results.summary, perCase: results.perCase?.slice(0, 50) } : null,
+  });
+  const handleLoadScenario = async (id) => {
+    const s = await scenarioHook.loadScenario(id);
+    if (s?.data) {
+      const d = s.data;
+      if (d.numSims) setNumSims(d.numSims);
+      if (d.feeVariance != null) setFeeVariance(d.feeVariance);
+      if (d.winRateVariance != null) setWinRateVariance(d.winRateVariance);
+      if (d.simKpis) setSimKpis(d.simKpis);
+    }
+  };
 
   // Initialize simKpis from context
   useEffect(() => {
@@ -1194,6 +1214,15 @@ export default function MonteCarloForecaster() {
 
         {/* Export + Actions */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
+          <ScenarioSelector
+            scenarios={scenarioHook.scenarios}
+            activeId={scenarioHook.activeId}
+            loading={scenarioHook.loading}
+            onSave={(name, data) => scenarioHook.saveScenario(name, data)}
+            onLoad={handleLoadScenario}
+            onDelete={scenarioHook.deleteScenario}
+            getDataToSave={getDataToSave}
+          />
           <ExportToolbar
             contentRef={contentRef}
             pdfFilename="BenefitArc-Monte-Carlo-Forecast"
