@@ -9,6 +9,7 @@ export default function OnboardingWizard() {
   const [completing, setCompleting] = useState(false);
 
   const markComplete = async () => {
+    try { localStorage.setItem('benefitarc-onboarding-done', 'true'); } catch {}
     if (user?.id && user.id !== 'demo-user-id') {
       await supabase
         .from('profiles')

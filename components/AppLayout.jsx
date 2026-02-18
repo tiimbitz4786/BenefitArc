@@ -13,11 +13,13 @@ export default function AppLayout({ children, firmSettings }) {
   const { user, loading, isApproved, onboardingCompleted } = useAuth();
   const { isDemoMode } = useDemo();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [localOnboardingDone, setLocalOnboardingDone] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('benefitarc-sidebar-collapsed');
       setSidebarCollapsed(saved === 'true');
+      setLocalOnboardingDone(localStorage.getItem('benefitarc-onboarding-done') === 'true');
     } catch {}
 
     const interval = setInterval(() => {
@@ -57,7 +59,7 @@ export default function AppLayout({ children, firmSettings }) {
   return (
     <>
       {isDemoMode && <DemoBanner />}
-      {!onboardingCompleted && !isDemoMode && <OnboardingWizard />}
+      {!onboardingCompleted && !localOnboardingDone && !isDemoMode && <OnboardingWizard />}
       <Sidebar firmSettings={firmSettings} />
       <main style={{
         marginLeft,
