@@ -914,8 +914,33 @@ export default function T12Analyzer() {
     setShowTextInput(false);
   }, []);
 
-  const formatCurrency = (v) => new Intl.NumberFormat('en-US', { 
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0 
+  // Fire-and-forget: insert anonymized T12 snapshot if user opted in
+  const maybeInsertT12Snapshot = async () => {
+    if (!user || user.id === 'demo-user-id') return;
+    try {
+      const { data: settings } = await supabase
+        .from('firm_settings')
+        .select('contribute_benchmarks')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!settings?.contribute_benchmarks) return;
+
+      await supabase.from('t12_snapshots').insert({
+        snapshot_date: new Date().toISOString(),
+        marketing_pct: summary.marketingPct,
+        labor_pct: summary.laborPct,
+        other_pct: summary.otherPct,
+        profit_pct: summary.profitPct,
+        ss_revenue_pct: ssRevenuePercent,
+      });
+    } catch (err) {
+      console.warn('T12 snapshot insert failed (non-critical):', err?.message);
+    }
+  };
+
+  const formatCurrency = (v) => new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0
   }).format(v || 0);
 
   const formatPercent = (v) => `${v.toFixed(1)}%`;
@@ -2007,7 +2032,10 @@ export default function T12Analyzer() {
           ← Back
         </button>
         <button
-          onClick={() => setStep(3)}
+          onClick={() => {
+            setStep(3);
+            maybeInsertT12Snapshot();
+          }}
           style={{
             padding: '12px 32px', borderRadius: '10px', border: 'none',
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
