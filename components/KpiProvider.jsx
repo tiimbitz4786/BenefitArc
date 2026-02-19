@@ -118,6 +118,29 @@ export function KpiProvider({ children }) {
     return () => { mounted = false; };
   }, [userId]);
 
+  // Fire-and-forget: insert anonymized KPI snapshot if user opted in
+  const maybeInsertSnapshot = async (kpiData) => {
+    try {
+      const { data: settings } = await supabase
+        .from('firm_settings')
+        .select('contribute_benchmarks')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!settings?.contribute_benchmarks) return;
+
+      const snapshot = { snapshot_date: new Date().toISOString() };
+      for (const key of Object.keys(DEFAULT_KPIS)) {
+        const val = kpiData[key];
+        snapshot[key] = (val === '' || val == null) ? null : val;
+      }
+
+      await supabase.from('kpi_snapshots').insert(snapshot);
+    } catch (err) {
+      console.warn('KPI snapshot insert failed (non-critical):', err?.message);
+    }
+  };
+
   const saveKpis = async (newKpis) => {
     if (isDemoMode) {
       setKpis(newKpis);
@@ -147,12 +170,14 @@ export function KpiProvider({ children }) {
 
       if (!retryError) {
         setKpis(newKpis);
+        maybeInsertSnapshot(newKpis);
         return { error: null };
       }
       return { error: retryError };
     }
 
     setKpis(newKpis);
+    maybeInsertSnapshot(newKpis);
     return { error: null };
   };
 

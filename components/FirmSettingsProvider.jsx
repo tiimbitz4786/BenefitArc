@@ -12,6 +12,7 @@ const DEFAULT_FIRM_SETTINGS = {
   firm_name: '',
   logo_base64: '',
   accent_color: '#6366f1',
+  contribute_benchmarks: true,
 };
 
 export function FirmSettingsProvider({ children }) {
@@ -44,6 +45,7 @@ export function FirmSettingsProvider({ children }) {
             firm_name: data.firm_name || '',
             logo_base64: data.logo_base64 || '',
             accent_color: data.accent_color || '#6366f1',
+            contribute_benchmarks: data.contribute_benchmarks || false,
           });
         } else {
           setFirmSettings(DEFAULT_FIRM_SETTINGS);
@@ -69,6 +71,7 @@ export function FirmSettingsProvider({ children }) {
       firm_name: newSettings.firm_name || '',
       logo_base64: newSettings.logo_base64 || '',
       accent_color: newSettings.accent_color || '#6366f1',
+      contribute_benchmarks: newSettings.contribute_benchmarks || false,
       updated_at: new Date().toISOString(),
     };
 

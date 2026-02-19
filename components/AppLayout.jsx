@@ -8,18 +8,21 @@ import PendingApproval from './PendingApproval';
 import Sidebar from './Sidebar';
 import DemoBanner from './DemoBanner';
 import OnboardingWizard from './OnboardingWizard';
+import BenchmarkNotice from './BenchmarkNotice';
 
 export default function AppLayout({ children, firmSettings }) {
   const { user, loading, isApproved, onboardingCompleted } = useAuth();
   const { isDemoMode } = useDemo();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [localOnboardingDone, setLocalOnboardingDone] = useState(false);
+  const [benchmarkNoticeSeen, setBenchmarkNoticeSeen] = useState(true);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('benefitarc-sidebar-collapsed');
       setSidebarCollapsed(saved === 'true');
       setLocalOnboardingDone(localStorage.getItem('benefitarc-onboarding-done') === 'true');
+      setBenchmarkNoticeSeen(localStorage.getItem('benefitarc-benchmark-notice-seen') === 'true');
     } catch {}
 
     const interval = setInterval(() => {
@@ -60,6 +63,7 @@ export default function AppLayout({ children, firmSettings }) {
     <>
       {isDemoMode && <DemoBanner />}
       {!onboardingCompleted && !localOnboardingDone && !isDemoMode && <OnboardingWizard />}
+      {!benchmarkNoticeSeen && !isDemoMode && <BenchmarkNotice onDismiss={() => setBenchmarkNoticeSeen(true)} />}
       <Sidebar firmSettings={firmSettings} />
       <main style={{
         marginLeft,

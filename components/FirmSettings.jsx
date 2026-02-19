@@ -14,7 +14,7 @@ const ACCENT_PRESETS = [
 
 export default function FirmSettings() {
   const { firmSettings, firmSettingsLoading, saveFirmSettings } = useFirmSettings();
-  const [form, setForm] = useState({ firm_name: '', logo_base64: '', accent_color: '#6366f1' });
+  const [form, setForm] = useState({ firm_name: '', logo_base64: '', accent_color: '#6366f1', contribute_benchmarks: false });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -24,6 +24,7 @@ export default function FirmSettings() {
         firm_name: firmSettings.firm_name || '',
         logo_base64: firmSettings.logo_base64 || '',
         accent_color: firmSettings.accent_color || '#6366f1',
+        contribute_benchmarks: firmSettings.contribute_benchmarks || false,
       });
     }
   }, [firmSettingsLoading, firmSettings]);
@@ -169,6 +170,57 @@ export default function FirmSettings() {
                 }}
               />
             ))}
+          </div>
+        </div>
+
+        {/* Benchmark Data Sharing */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{ display: 'block', color: '#94a3b8', fontSize: '12px', marginBottom: '10px', fontWeight: '500' }}>
+            Benchmark Data Sharing
+          </label>
+          <div style={{
+            background: 'rgba(15, 15, 25, 0.6)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            borderRadius: '12px',
+            padding: '16px',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', gap: '16px',
+            }}>
+              <div>
+                <div style={{ fontSize: '14px', color: '#f8fafc', fontWeight: '500', marginBottom: '4px' }}>
+                  Contribute anonymized KPIs to industry benchmarks
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                  When enabled, each time you save your KPI settings an anonymized snapshot
+                  (with no identifying information) is recorded to help build industry-wide
+                  benchmark data. You can opt out at any time.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({
+                  ...prev, contribute_benchmarks: !prev.contribute_benchmarks,
+                }))}
+                style={{
+                  flexShrink: 0, width: '48px', height: '26px', borderRadius: '13px',
+                  border: 'none', cursor: 'pointer', position: 'relative',
+                  background: form.contribute_benchmarks
+                    ? 'linear-gradient(135deg, #10b981, #6366f1)'
+                    : 'rgba(100, 116, 139, 0.3)',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: '#f8fafc', position: 'absolute', top: '3px',
+                  left: form.contribute_benchmarks ? '25px' : '3px',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }} />
+              </button>
+            </div>
           </div>
         </div>
 
