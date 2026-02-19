@@ -415,6 +415,7 @@ export default function T12Analyzer() {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalFirmRevenue, setTotalFirmRevenue] = useState(0); // For calculating SS percentage
   const [ssRevenuePercent, setSsRevenuePercent] = useState(0); // SS as % of total firm revenue
+  const [ssEmployeePercent, setSsEmployeePercent] = useState(null); // null = not yet entered
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseError, setParseError] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -1058,6 +1059,7 @@ export default function T12Analyzer() {
     setTotalRevenue(0);
     setTotalFirmRevenue(0);
     setSsRevenuePercent(0);
+    setSsEmployeePercent(null);
     setParseError(null);
     setStep(0);
     setDataConfirmed(false);
@@ -1520,7 +1522,7 @@ export default function T12Analyzer() {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const effectivePercent = decision === 'partial'
-          ? (useAuto ? ssRevenuePercent : partialPercent)
+          ? (useAuto ? (ssEmployeePercent ?? ssRevenuePercent) : partialPercent)
           : null;
 
         // Save rule for future uploads
@@ -1535,14 +1537,14 @@ export default function T12Analyzer() {
       }
       return item;
     }));
-  }, [ssRevenuePercent, saveRule]);
+  }, [ssEmployeePercent, ssRevenuePercent, saveRule]);
   
   // Handle bulk decision for all items in a section
   const handleSectionDecision = useCallback((sectionPath, decision, partialPercent = null, useAuto = false) => {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.sectionPath === sectionPath) {
         const effectivePercent = decision === 'partial'
-          ? (useAuto ? ssRevenuePercent : partialPercent)
+          ? (useAuto ? (ssEmployeePercent ?? ssRevenuePercent) : partialPercent)
           : null;
 
         // Save rule for each item in the section
@@ -1557,7 +1559,7 @@ export default function T12Analyzer() {
       }
       return item;
     }));
-  }, [ssRevenuePercent, saveRule]);
+  }, [ssEmployeePercent, ssRevenuePercent, saveRule]);
   
   // Group uncategorized items by section path for display
   const groupedUncategorizedItems = useMemo(() => {
@@ -1689,8 +1691,78 @@ export default function T12Analyzer() {
             </div>
           </>
         )}
+        {ssEmployeePercent != null && (
+          <div>
+            <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>SS Staff %</div>
+            <div style={{ fontSize: '18px', color: '#f59e0b', fontWeight: '700' }}>{ssEmployeePercent.toFixed(1)}%</div>
+          </div>
+        )}
       </div>
       
+      {/* SS Employee % — only for mixed-practice firms */}
+      {ssRevenuePercent < 100 && (
+        <div style={{
+          padding: '14px 18px',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%)',
+          borderRadius: '12px',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          marginBottom: '20px',
+        }}>
+          <div style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600', marginBottom: '8px' }}>
+            Mixed-Practice Firm Detected
+          </div>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0', lineHeight: '1.5' }}>
+            Your firm has revenue outside of Social Security. What percentage of your staff is dedicated to SS work?
+            This will be used to allocate shared expenses.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="e.g. 60"
+              value={ssEmployeePercent ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSsEmployeePercent(val === '' ? null : Math.min(100, Math.max(0, parseFloat(val) || 0)));
+              }}
+              style={{
+                width: '80px', padding: '8px 12px', borderRadius: '8px',
+                border: '1px solid rgba(245, 158, 11, 0.4)', background: 'rgba(15, 15, 25, 0.8)',
+                color: '#f1f5f9', fontSize: '14px', fontWeight: '600', textAlign: 'center',
+              }}
+            />
+            <span style={{ color: '#94a3b8', fontSize: '14px' }}>%</span>
+            <button
+              onClick={() => {
+                if (ssEmployeePercent != null && ssEmployeePercent > 0) {
+                  setUncategorizedItems(prev => prev.map(item => {
+                    saveRule(item.description, 'partial', ssEmployeePercent, item.category);
+                    return {
+                      ...item,
+                      decision: 'partial',
+                      partialPercent: ssEmployeePercent,
+                      useAutoPercent: true,
+                    };
+                  }));
+                }
+              }}
+              disabled={ssEmployeePercent == null || ssEmployeePercent <= 0}
+              style={{
+                padding: '8px 16px', borderRadius: '8px', border: 'none',
+                background: (ssEmployeePercent != null && ssEmployeePercent > 0)
+                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  : 'rgba(245, 158, 11, 0.2)',
+                color: 'white', fontSize: '12px', fontWeight: '600',
+                cursor: (ssEmployeePercent != null && ssEmployeePercent > 0) ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Apply to All Items
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div style={{
         padding: '12px 16px',
@@ -1801,7 +1873,7 @@ export default function T12Analyzer() {
                       ✕ Exclude All
                     </button>
                     <button
-                      onClick={() => handleSectionDecision(group.path === '(No Section)' ? '' : group.path, 'partial', ssRevenuePercent, true)}
+                      onClick={() => handleSectionDecision(group.path === '(No Section)' ? '' : group.path, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
                       style={{
                         padding: '4px 10px',
                         borderRadius: '4px',
@@ -1846,7 +1918,7 @@ export default function T12Analyzer() {
                         </div>
                         {item.decision === 'partial' && item.partialPercent && (
                           <div style={{ color: '#f59e0b', fontSize: '9px' }}>
-                            → {formatCurrency(item.amount * item.partialPercent / 100)}
+                            {item.partialPercent.toFixed(1)}% → {formatCurrency(item.amount * item.partialPercent / 100)}
                           </div>
                         )}
                       </div>
@@ -1884,7 +1956,7 @@ export default function T12Analyzer() {
                           ✕
                         </button>
                         <button
-                          onClick={() => handleItemDecision(item.id, 'partial', ssRevenuePercent, true)}
+                          onClick={() => handleItemDecision(item.id, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
