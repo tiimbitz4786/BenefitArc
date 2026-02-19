@@ -160,6 +160,26 @@ const MARKETING_SECTION_KEYWORDS = [
   'brand', 'branding', 'promotion', 'promotional',
   'media', 'tv', 'television', 'radio', 'outdoor', 'billboard',
   'digital', 'ppc', 'seo', 'lead', 'leads', 'acquisition',
+  // Expanded marketing keywords
+  'marketing expense', 'marketing expenses', 'advertising expense', 'advertising expenses',
+  'ad spend', 'google ads', 'facebook ads', 'meta ads', 'bing ads',
+  'social media', 'content marketing', 'email marketing',
+  'pay per click', 'cost per click', 'cpc', 'cpm', 'cpl', 'cpa',
+  'web design', 'graphic design', 'creative services',
+  'public relations', 'pr', 'sponsorship', 'sponsorships',
+  'trade show', 'trade shows', 'event marketing',
+  'direct mail', 'mailer', 'mailers', 'flyer', 'flyers',
+  'referral', 'referrals', 'referral fees', 'referral marketing',
+  'marketing consultant', 'agency', 'ad agency',
+  'signage', 'signs', 'banner', 'banners',
+  'yellow pages', 'directory', 'listing',
+  'commercial', 'jingle', 'spot',
+  'retargeting', 'remarketing', 'display ads',
+  'video production', 'photography',
+  'market research', 'focus group',
+  'print advertising', 'newspaper', 'magazine',
+  // QuickBooks defaults
+  'advertising and promotion', 'marketing and advertising',
 ];
 
 // Keywords that indicate Labor/Wages section
@@ -203,6 +223,113 @@ const LABOR_SECTION_KEYWORDS = [
   'malpractice', 'professional liability', 'e&o', 'errors and omissions',
   'bonus', 'bonuses', 'commission', 'commissions', 'incentive', 'incentives',
   'outsource', 'outsourcing', 'staffing', 'temp', 'temporary',
+  // Expanded labor keywords
+  'labor expense', 'labor expenses', 'labor cost', 'labor costs',
+  'employee expense', 'employee expenses', 'staff expense', 'staff expenses',
+  'staff cost', 'staff costs', 'personnel expense', 'personnel expenses',
+  'human resources', 'hr', 'headcount',
+  'gross wages', 'net wages', 'gross pay', 'net pay', 'take home',
+  'overtime', 'ot', 'regular pay', 'hourly', 'salaried',
+  'direct deposit',
+  'w-2', 'w2', '1099',
+  'garnishment', 'garnishments', 'child support',
+  'employee benefits', 'fringe', 'fringe benefits',
+  'group health', 'group insurance', 'group life',
+  'employee assistance', 'eap',
+  'tuition reimbursement', 'student loan',
+  'uniform', 'uniforms',
+  'background check', 'drug test', 'drug testing',
+  'recruiting', 'recruitment', 'hiring', 'onboarding',
+  'severance', 'termination', 'separation',
+  'per diem', 'stipend', 'allowance',
+  'holiday pay', 'holiday', 'holidays',
+  'bereavement', 'jury duty',
+  // QuickBooks defaults
+  'payroll expenses', 'payroll expense',
+  'employee benefit expenses', 'employee benefit expense',
+  'salaries and wages', 'wages and salaries',
+  'officer compensation', 'officers compensation',
+  'guaranteed payments', 'partner compensation',
+  'contract labor', 'subcontractor', 'subcontractors',
+];
+
+const OTHER_KEYWORDS = [
+  // Occupancy
+  'rent', 'lease', 'building', 'office space', 'occupancy',
+  'mortgage', 'property tax', 'property taxes',
+  // Utilities
+  'utilities', 'utility', 'electric', 'electricity', 'gas', 'water',
+  'sewer', 'trash', 'waste', 'internet', 'telephone', 'phone',
+  'cable', 'wifi', 'wi-fi', 'broadband',
+  // Office & Supplies
+  'office supplies', 'office expense', 'supplies', 'postage',
+  'shipping', 'freight', 'printing', 'copies', 'copier',
+  'stationery', 'toner', 'ink', 'paper',
+  // Professional Services (non-employee)
+  'accounting', 'accountant', 'cpa', 'audit', 'tax preparation',
+  'legal fees', 'consulting', 'consultant', 'professional fees',
+  'professional services', 'outside services',
+  // Technology (non-staffing)
+  'software', 'subscription', 'subscriptions', 'saas', 'license',
+  'licenses', 'cloud', 'hosting', 'domain', 'website',
+  'computer', 'hardware', 'equipment', 'maintenance',
+  'repairs', 'repair', 'tech support',
+  // Insurance (non-employee, business insurance)
+  'general liability', 'property insurance', 'business insurance',
+  'umbrella insurance', 'cyber insurance', 'flood insurance',
+  // Financial
+  'bank charges', 'bank fees', 'merchant fees', 'processing fees',
+  'credit card fees', 'interest expense', 'interest',
+  'finance charge', 'late fees', 'loan', 'line of credit',
+  // Depreciation & Amortization
+  'depreciation', 'amortization', 'accumulated depreciation',
+  // Travel & Entertainment
+  'travel', 'meals', 'entertainment', 'lodging', 'hotel',
+  'airfare', 'mileage', 'parking', 'tolls', 'uber', 'lyft',
+  // Dues & Education
+  'dues', 'memberships', 'bar dues', 'association',
+  'continuing education', 'training', 'seminar', 'conference',
+  'cle', 'education',
+  // Miscellaneous
+  'miscellaneous', 'misc', 'sundry', 'other expense',
+  'janitorial', 'cleaning', 'security', 'alarm',
+  'filing fees', 'court costs', 'court fees',
+  'process server', 'subpoena', 'deposition',
+  'expert witness', 'investigation', 'investigator',
+  'medical records', 'record retrieval',
+  'charitable', 'donations', 'contribution',
+  'bad debt', 'write-off', 'write off',
+  'penalties', 'fines',
+  'moving', 'relocation',
+  'furniture', 'fixtures',
+];
+
+const NOT_MARKETING_KEYWORDS = [
+  // Labor items that might appear under a marketing section
+  'salary', 'salaries', 'wages', 'wage', 'payroll',
+  'bonus', 'bonuses', 'commission', 'commissions',
+  'benefits', 'insurance', 'health insurance', '401k', '401(k)',
+  'retirement', 'fica', 'payroll tax', 'workers comp',
+  'pto', 'paid time off', 'vacation',
+  // Other items that might appear under a marketing section
+  'rent', 'lease', 'utilities', 'utility', 'telephone',
+  'office supplies', 'equipment', 'depreciation',
+  'bank charges', 'bank fees', 'interest',
+  'travel', 'meals', 'dues', 'memberships',
+];
+
+const NOT_LABOR_KEYWORDS = [
+  // Marketing items that might appear under a labor section
+  'advertising', 'advertisement', 'ads', 'ad spend',
+  'marketing', 'promotion', 'promotional',
+  'media', 'billboard', 'tv', 'television', 'radio',
+  'seo', 'ppc', 'google ads', 'facebook ads',
+  'lead generation', 'leads', 'acquisition',
+  // Other items that might appear under a labor section
+  'rent', 'lease', 'utilities', 'utility',
+  'office supplies', 'equipment', 'depreciation',
+  'bank charges', 'bank fees', 'interest',
+  'software', 'subscription', 'license',
 ];
 
 // Keywords that indicate an expense section (not revenue)
@@ -672,14 +799,38 @@ export default function T12Analyzer() {
           if (hasAmount && amount !== 0) {
             const absAmount = Math.abs(finalAmount);
             
-            // Determine category
+            // Smart categorization with line-item matching + negative guards
             let category = null;
+            const descMatchesMarketing = containsKeyword(description, MARKETING_SECTION_KEYWORDS);
+            const descMatchesLabor = containsKeyword(description, LABOR_SECTION_KEYWORDS);
+            const descIsNotMarketing = containsKeyword(description, NOT_MARKETING_KEYWORDS);
+            const descIsNotLabor = containsKeyword(description, NOT_LABOR_KEYWORDS);
+
             if (inMarketingParent) {
-              category = CATEGORIES.MARKETING;
+              // In a marketing section — guard against miscategorized items
+              if (descIsNotMarketing && !descMatchesMarketing) {
+                category = descMatchesLabor && !descIsNotLabor
+                  ? CATEGORIES.LABOR : CATEGORIES.OTHER;
+              } else {
+                category = CATEGORIES.MARKETING;
+              }
             } else if (inLaborParent) {
-              category = CATEGORIES.LABOR;
+              // In a labor section — guard against miscategorized items
+              if (descIsNotLabor && !descMatchesLabor) {
+                category = descMatchesMarketing && !descIsNotMarketing
+                  ? CATEGORIES.MARKETING : CATEGORIES.OTHER;
+              } else {
+                category = CATEGORIES.LABOR;
+              }
             } else {
-              category = CATEGORIES.OTHER;
+              // Not in a categorized section — line-item keyword matching
+              if (descMatchesMarketing && !descIsNotMarketing) {
+                category = CATEGORIES.MARKETING;
+              } else if (descMatchesLabor && !descIsNotLabor) {
+                category = CATEGORIES.LABOR;
+              } else {
+                category = CATEGORIES.OTHER;
+              }
             }
             
             const item = {
