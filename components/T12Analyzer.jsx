@@ -387,6 +387,40 @@ const isSSRelated = (text) => {
   return hasSSKeyword && !hasExclusion;
 };
 
+// Keywords that clearly indicate a non-SS practice area in an expense description.
+// Narrower than NON_SS_KEYWORDS to avoid false positives on generic overhead
+// (e.g., "lease", "property", "business" could be firm overhead, not practice-area expenses).
+const NON_SS_PRACTICE_KEYWORDS = [
+  // Personal Injury
+  'personal injury', 'mva', 'motor vehicle', 'auto accident', 'car accident',
+  'truck accident', 'slip and fall', 'slip & fall', 'premises liability',
+  'product liability', 'products liability', 'wrongful death', 'catastrophic injury',
+  'dog bite', 'animal attack',
+  // Medical Malpractice
+  'medical malpractice', 'med mal', 'nursing home abuse', 'elder abuse',
+  'birth injury', 'surgical error', 'misdiagnosis',
+  // Workers Compensation
+  'workers comp', "worker's comp", 'workers compensation', "worker's compensation",
+  'work comp',
+  // Criminal
+  'criminal defense', 'criminal law', 'dui', 'dwi',
+  // Family Law
+  'family law', 'divorce', 'child custody', 'child support', 'alimony',
+  'spousal support',
+  // Immigration
+  'immigration', 'deportation', 'asylum', 'uscis', 'green card',
+  // Bankruptcy
+  'bankruptcy', 'chapter 7', 'chapter 11', 'chapter 13',
+  // Intellectual Property
+  'patent', 'trademark', 'copyright', 'trade secret',
+];
+
+// Helper: Check if an expense description clearly belongs to a non-SS practice area
+const isNonSSExpense = (text) => {
+  if (containsKeyword(text, SS_KEYWORDS)) return false; // Has SS signal, don't exclude
+  return containsKeyword(text, NON_SS_PRACTICE_KEYWORDS);
+};
+
 // Helper: Check if text is a "Total for X" line and extract section name
 const getTotalForSection = (text) => {
   const lower = text.toLowerCase();
@@ -655,16 +689,129 @@ export default function T12Analyzer() {
           original: line,
         });
       }
-      
+
+      // ===== CHECK FOR COLON-DELIMITED HIERARCHICAL FORMAT =====
+      const linesWithAmounts = parsedLines.filter(l => l.hasAmount);
+      const colonLines = linesWithAmounts.filter(l => l.description.includes(':'));
+      const isColonFormat = linesWithAmounts.length > 0 && (colonLines.length / linesWithAmounts.length) > 0.5;
+
+      if (isColonFormat) {
+        // Skip header row if present (e.g., "Account,Amount")
+        const startIdx = parsedLines[0]?.description.toLowerCase().match(/^(account|description|name)$/) ? 1 : 0;
+
+        for (let i = startIdx; i < parsedLines.length; i++) {
+          const { description, amount, finalAmount, hasAmount } = parsedLines[i];
+          if (!hasAmount || amount === 0) continue;
+
+          const segments = description.split(':').map(s => s.trim());
+          const topLevel = segments[0].toLowerCase();
+          const leafDesc = segments[segments.length - 1];
+          const sectionPath = segments.slice(0, -1).join(' > ');
+          const absAmount = Math.abs(finalAmount);
+
+          // ===== INCOME =====
+          if (topLevel.startsWith('income') || topLevel.startsWith('revenue')) {
+            if (containsKeyword(description, EXCLUDED_REVENUE_KEYWORDS)) {
+              excludedRevenue += absAmount;
+            } else if (finalAmount < 0) {
+              // Contra-income (refunds, write-offs) - reduce firm revenue
+              firmRevenue -= absAmount;
+            } else {
+              firmRevenue += amount;
+              if (isSSRelated(description) || isSSRelated(leafDesc)) {
+                ssRevenue += amount;
+              }
+            }
+            continue;
+          }
+
+          // ===== OTHER INCOME & EXPENSE =====
+          if (topLevel.includes('other income') || topLevel.includes('other expense')) {
+            // Skip non-operating items
+            continue;
+          }
+
+          // ===== EXPENSES (Operating Expenses, COGS, etc.) =====
+          if (topLevel.includes('expense') || topLevel.includes('cost of goods') || topLevel.includes('cogs')) {
+            // Determine category from path segments and leaf description
+            const fullPath = segments.join(' ');
+            const pathHasMarketing = segments.some(s => containsKeyword(s, MARKETING_SECTION_KEYWORDS));
+            const pathHasLabor = segments.some(s => containsKeyword(s, LABOR_SECTION_KEYWORDS));
+            const descMatchesMarketing = containsKeyword(leafDesc, MARKETING_SECTION_KEYWORDS);
+            const descMatchesLabor = containsKeyword(leafDesc, LABOR_SECTION_KEYWORDS);
+            const descIsNotMarketing = containsKeyword(leafDesc, NOT_MARKETING_KEYWORDS);
+            const descIsNotLabor = containsKeyword(leafDesc, NOT_LABOR_KEYWORDS);
+
+            let category = null;
+            if (pathHasMarketing || (descMatchesMarketing && !descIsNotMarketing)) {
+              if (descIsNotMarketing && !descMatchesMarketing) {
+                category = (descMatchesLabor && !descIsNotLabor) ? CATEGORIES.LABOR : CATEGORIES.OTHER;
+              } else {
+                category = CATEGORIES.MARKETING;
+              }
+            } else if (pathHasLabor || (descMatchesLabor && !descIsNotLabor)) {
+              if (descIsNotLabor && !descMatchesLabor) {
+                category = (descMatchesMarketing && !descIsNotMarketing) ? CATEGORIES.MARKETING : CATEGORIES.OTHER;
+              } else {
+                category = CATEGORIES.LABOR;
+              }
+            } else {
+              category = CATEGORIES.OTHER;
+            }
+
+            const item = {
+              id: `item-${ssItems.length + uncategorized.length}`,
+              description: leafDesc,
+              amount: absAmount,
+              isNegative: finalAmount < 0,
+              category,
+              sectionPath,
+              originalLine: parsedLines[i].original,
+              decision: null,
+              partialPercent: null,
+              useAutoPercent: false,
+            };
+
+            // Check saved rules first
+            const descKey = normalizeDescription(leafDesc);
+            const savedRule = savedRules[descKey];
+
+            if (savedRule) {
+              if (savedRule.decision === 'include') {
+                ssItems.push({ ...item, category: savedRule.category || category, autoAppliedRule: true });
+              } else if (savedRule.decision === 'partial' && savedRule.partialPercent > 0) {
+                ssItems.push({
+                  ...item,
+                  amount: absAmount * (savedRule.partialPercent / 100),
+                  originalAmount: absAmount,
+                  appliedPercent: savedRule.partialPercent,
+                  category: savedRule.category || category,
+                  autoAppliedRule: true,
+                });
+              }
+              // 'exclude' → silently excluded
+            } else if (isSSRelated(fullPath)) {
+              // Path contains SS keywords → include directly
+              ssItems.push(item);
+            } else if (isNonSSExpense(fullPath)) {
+              // Path contains non-SS practice keywords → auto-exclude
+            } else {
+              // No SS signal → uncategorized, user decides
+              uncategorized.push(item);
+            }
+          }
+        }
+      } else {
+      // ===== EXISTING SECOND PASS (section-state-machine) =====
       // Second pass: analyze and categorize
       for (let i = 0; i < parsedLines.length; i++) {
         const { description, amount, finalAmount, hasAmount, isNegative } = parsedLines[i];
         const lowerDesc = description.toLowerCase();
-        
+
         if (!description || lowerDesc.includes('cash basis') || lowerDesc === 'profit and loss') {
           continue;
         }
-        
+
         // ===== MAIN SECTIONS =====
         if (lowerDesc === 'income' || lowerDesc === 'revenue' || lowerDesc === 'income:' || lowerDesc === 'revenue:') {
           inIncomeSection = true;
@@ -676,8 +823,8 @@ export default function T12Analyzer() {
           inNonSSSubsection = false;
           continue;
         }
-        
-        if (lowerDesc === 'expenses' || lowerDesc === 'expense' || lowerDesc === 'expenses:' || 
+
+        if (lowerDesc === 'expenses' || lowerDesc === 'expense' || lowerDesc === 'expenses:' ||
             lowerDesc === 'operating expenses' || lowerDesc === 'cost of goods sold') {
           inIncomeSection = false;
           inExpenseSection = true;
@@ -688,13 +835,13 @@ export default function T12Analyzer() {
           inNonSSSubsection = false;
           continue;
         }
-        
-        if (lowerDesc === 'other income' || lowerDesc === 'gross profit' || 
+
+        if (lowerDesc === 'other income' || lowerDesc === 'gross profit' ||
             lowerDesc === 'net income' || lowerDesc === 'net operating income') {
           inIncomeSection = false;
           continue;
         }
-        
+
         // ===== TOTAL FOR X LINES =====
         const totalForSection = getTotalForSection(description);
         if (totalForSection) {
@@ -702,12 +849,12 @@ export default function T12Analyzer() {
           if (lowerDesc === 'total for income' || lowerDesc === 'total income' || lowerDesc === 'total revenue') {
             firmRevenue = amount;
           }
-          
+
           // Check if this is an excluded revenue total (like ERC)
           if (inIncomeSection && containsKeyword(totalForSection, EXCLUDED_REVENUE_KEYWORDS) && hasAmount && amount > 0) {
             excludedRevenue += amount;
           }
-          
+
           // Capture SS revenue total
           if (inIncomeSection && isSSRelated(totalForSection) && hasAmount && amount > 0) {
             if (amount > ssRevenue) {
@@ -715,43 +862,43 @@ export default function T12Analyzer() {
               ssRevenueSource = description;
             }
           }
-          
+
           // Pop from stack - only close sections that exactly match
           const closingSection = totalForSection.trim().toLowerCase();
-          
+
           // Find the matching section in the stack (search from end)
           let matchIndex = -1;
           for (let i = sectionStack.length - 1; i >= 0; i--) {
             const sectionLower = sectionStack[i].toLowerCase();
-            
+
             // Exact match only (case-insensitive)
             if (sectionLower === closingSection) {
               matchIndex = i;
               break;
             }
           }
-          
+
           // Only pop if we found an exact match
           if (matchIndex >= 0) {
             // Remove this section and everything after it
             sectionStack.length = matchIndex;
           }
           // If no exact match, this "Total for X" is a subtotal for line items, not a section closer
-          
+
           // Re-evaluate ALL context based on remaining stack
           inMarketingParent = sectionStack.some(s => containsKeyword(s, MARKETING_SECTION_KEYWORDS));
           inLaborParent = sectionStack.some(s => containsKeyword(s, LABOR_SECTION_KEYWORDS));
           inSSSubsection = sectionStack.some(s => isSSRelated(s));
           inNonSSSubsection = sectionStack.some(s => containsKeyword(s, NON_SS_KEYWORDS));
-          
+
           // Reset ssSubsectionType if we're no longer in an SS subsection
           if (!inSSSubsection) {
             ssSubsectionType = null;
           }
-          
+
           continue;
         }
-        
+
         // ===== INCOME SECTION: Track individual items for exclusion =====
         if (inIncomeSection && hasAmount && amount > 0) {
           // Check if this is an excluded revenue item (like ERC)
@@ -759,16 +906,16 @@ export default function T12Analyzer() {
             excludedRevenue += amount;
           }
         }
-        
+
         // ===== EXPENSE SECTION =====
         if (inExpenseSection) {
           if (lowerDesc.startsWith('total')) continue;
-          
+
           // Section headers (no amount)
           if (!hasAmount && description) {
             sectionStack.push(description);
             currentPath = sectionStack.join(' > ');
-            
+
             // Check if this section or any parent is marketing/labor
             // Use the full stack to determine context (don't reset, accumulate)
             if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) {
@@ -777,7 +924,7 @@ export default function T12Analyzer() {
             if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) {
               inLaborParent = true;
             }
-            
+
             // Check if SS or Non-SS subsection
             if (isSSRelated(description)) {
               inSSSubsection = true;
@@ -795,11 +942,11 @@ export default function T12Analyzer() {
             }
             continue;
           }
-          
+
           // ===== LINE ITEMS WITH AMOUNTS =====
           if (hasAmount && amount !== 0) {
             const absAmount = Math.abs(finalAmount);
-            
+
             // Smart categorization with line-item matching + negative guards
             let category = null;
             const descMatchesMarketing = containsKeyword(description, MARKETING_SECTION_KEYWORDS);
@@ -833,7 +980,7 @@ export default function T12Analyzer() {
                 category = CATEGORIES.OTHER;
               }
             }
-            
+
             const item = {
               id: `item-${ssItems.length + uncategorized.length}`,
               description,
@@ -847,7 +994,7 @@ export default function T12Analyzer() {
               partialPercent: null,
               useAutoPercent: false,
             };
-            
+
             // Check saved user rules FIRST, then fall back to keyword logic
             const descKey = normalizeDescription(description);
             const savedRule = savedRules[descKey];
@@ -877,13 +1024,19 @@ export default function T12Analyzer() {
               ssItems.push(item);
             } else if (inNonSSSubsection) {
               // Clearly NOT SS - skip (exclude automatically)
+            } else if (isSSRelated(description)) {
+              // Line-item description contains SS keywords → auto-include
+              ssItems.push(item);
+            } else if (isNonSSExpense(description)) {
+              // Line-item description contains non-SS practice keywords → auto-exclude
             } else {
-              // Not in any SS or Non-SS subsection - needs user decision
+              // No practice-area signal → uncategorized, user decides
               uncategorized.push(item);
             }
           }
         }
       }
+      } // end else (non-colon format)
       
       // Validation
       if (ssRevenue === 0 && firmRevenue === 0) {
@@ -898,7 +1051,13 @@ export default function T12Analyzer() {
       
       // Calculate SS percentage of adjusted firm revenue
       const ssPercent = adjustedFirmRevenue > 0 ? (ssRevenue / adjustedFirmRevenue * 100) : 100;
-      
+
+      // Pure SS firm: all expenses are SS expenses by definition — auto-include everything
+      if (ssPercent >= 100 && uncategorized.length > 0) {
+        ssItems.push(...uncategorized);
+        uncategorized.length = 0;
+      }
+
       setParsedItems(ssItems);
       setCategorizedItems(ssItems);
       setUncategorizedItems(uncategorized);
