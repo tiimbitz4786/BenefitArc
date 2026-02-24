@@ -803,6 +803,37 @@ export default function T12Analyzer() {
         }
       } else {
       // ===== EXISTING SECOND PASS (section-state-machine) =====
+
+      // Pre-scan: identify parent-with-amount lines by simulating stack nesting.
+      // A line is a "parent with amount" if it has an amount AND a matching
+      // "Total for X" closes it later (e.g., "Admin,$752K" ... "Total for Admin").
+      const parentWithAmountLines = new Set();
+      const preScanStack = [];
+
+      for (let i = 0; i < parsedLines.length; i++) {
+        const { description, hasAmount } = parsedLines[i];
+        if (!description) continue;
+        const lowerDesc = description.toLowerCase().trim();
+        if (lowerDesc.startsWith('total')) {
+          const totalFor = getTotalForSection(description);
+          if (totalFor) {
+            const closingName = totalFor.trim().toLowerCase();
+            for (let j = preScanStack.length - 1; j >= 0; j--) {
+              if (preScanStack[j].name === closingName) {
+                if (preScanStack[j].hasAmount) {
+                  parentWithAmountLines.add(preScanStack[j].lineIndex);
+                }
+                preScanStack.length = j;
+                break;
+              }
+            }
+          }
+          continue;
+        }
+        // Push both headers (no amount) and potential parents (with amount)
+        preScanStack.push({ name: lowerDesc, lineIndex: i, hasAmount });
+      }
+
       // Second pass: analyze and categorize
       for (let i = 0; i < parsedLines.length; i++) {
         const { description, amount, finalAmount, hasAmount, isNegative } = parsedLines[i];
@@ -910,6 +941,40 @@ export default function T12Analyzer() {
         // ===== EXPENSE SECTION =====
         if (inExpenseSection) {
           if (lowerDesc.startsWith('total')) continue;
+
+          // Parent category with direct amount (e.g., "Admin $752K" with "Total for Admin" later)
+          const isParentWithAmount = parentWithAmountLines.has(i);
+
+          if (isParentWithAmount && hasAmount) {
+            // Push to stack for hierarchy
+            sectionStack.push(description);
+            currentPath = sectionStack.join(' > ');
+
+            // Update SS/non-SS context (affects practice area classification)
+            if (isSSRelated(description)) {
+              inSSSubsection = true;
+              inNonSSSubsection = false;
+              if (inMarketingParent) ssSubsectionType = 'marketing';
+              else if (inLaborParent) ssSubsectionType = 'labor';
+              else ssSubsectionType = 'expense';
+            } else if (containsKeyword(description, NON_SS_KEYWORDS)) {
+              inNonSSSubsection = true;
+              inSSSubsection = false;
+            }
+
+            // Only update marketing/labor category if NOT already in a categorized parent
+            // (prevents "Marketing" under WAGES from overriding the Labor category)
+            if (!inMarketingParent && !inLaborParent) {
+              if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) {
+                inMarketingParent = true;
+              }
+              if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) {
+                inLaborParent = true;
+              }
+            }
+
+            // Fall through to line-item creation below (don't continue)
+          }
 
           // Section headers (no amount)
           if (!hasAmount && description) {
