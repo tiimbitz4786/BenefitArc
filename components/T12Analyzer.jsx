@@ -147,7 +147,7 @@ const NON_SS_KEYWORDS = [
   'tax law', 'tax ', 'irs', 'tax court',
   
   // Other
-  'civil litigation', 'civil rights',
+  'litigation', 'civil litigation', 'civil rights',
   'class action', 'mass tort',
   'medicare', // Medicare is different from SS Disability
   'medicaid',
