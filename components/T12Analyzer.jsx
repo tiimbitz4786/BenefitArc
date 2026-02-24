@@ -964,15 +964,13 @@ export default function T12Analyzer() {
               inSSSubsection = false;
             }
 
-            // Only update marketing/labor category if NOT already in a categorized parent
-            // (prevents "Marketing" under WAGES from overriding the Labor category)
-            if (!inMarketingParent && !inLaborParent) {
-              if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) {
-                inMarketingParent = true;
-              }
-              if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) {
-                inLaborParent = true;
-              }
+            // Allow marketing context even inside labor (marketing employees' costs
+            // should use ad % allocation). Labor context inside marketing is also allowed.
+            if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) {
+              inMarketingParent = true;
+            }
+            if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) {
+              inLaborParent = true;
             }
 
             // Fall through to line-item creation below (don't continue)
