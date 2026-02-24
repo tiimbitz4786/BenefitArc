@@ -1098,6 +1098,7 @@ export default function T12Analyzer() {
               // Line-item description contains non-SS practice keywords → auto-exclude
             } else {
               // No practice-area signal → uncategorized, user decides
+              console.log('[T12 DEBUG] Uncategorized item:', description, '| category:', category, '| path:', currentPath, '| inMktParent:', inMarketingParent);
               uncategorized.push(item);
             }
           }
@@ -1969,11 +1970,13 @@ export default function T12Analyzer() {
               onClick={() => {
                 if (ssEmployeePercent != null && ssEmployeePercent > 0) {
                   setUncategorizedItems(prev => prev.map(item => {
-                    saveRule(item.description, 'partial', ssEmployeePercent, item.category);
+                    const pct = (item.category === 'marketing' && ssAdPercent != null && ssAdPercent > 0)
+                      ? ssAdPercent : ssEmployeePercent;
+                    saveRule(item.description, 'partial', pct, item.category);
                     return {
                       ...item,
                       decision: 'partial',
-                      partialPercent: ssEmployeePercent,
+                      partialPercent: pct,
                       useAutoPercent: true,
                     };
                   }));
