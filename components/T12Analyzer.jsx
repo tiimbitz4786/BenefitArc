@@ -913,6 +913,7 @@ export default function T12Analyzer() {
           if (matchIndex >= 0) {
             // Remove this section and everything after it
             sectionStack.length = matchIndex;
+            currentPath = sectionStack.join(' > ');
           }
           // If no exact match, this "Total for X" is a subtotal for line items, not a section closer
 
