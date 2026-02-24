@@ -2174,21 +2174,28 @@ export default function T12Analyzer() {
                     >
                       ✕ Exclude All
                     </button>
-                    <button
-                      onClick={() => handleSectionDecision(group.path === '(No Section)' ? '' : group.path, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        border: allPartialAuto ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.3)',
-                        background: allPartialAuto ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
-                        color: '#f59e0b',
-                        fontSize: '10px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Auto % All
-                    </button>
+                    {(() => {
+                      const isAdGroup = group.items.some(it => it.category === 'marketing');
+                      const ac = isAdGroup ? '#60a5fa' : '#f59e0b';
+                      const ar = isAdGroup ? 'rgba(59, 130, 246,' : 'rgba(245, 158, 11,';
+                      return (
+                        <button
+                          onClick={() => handleSectionDecision(group.path === '(No Section)' ? '' : group.path, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            border: allPartialAuto ? `2px solid ${ac}` : `1px solid ${ar} 0.3)`,
+                            background: allPartialAuto ? `${ar} 0.2)` : 'transparent',
+                            color: ac,
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Auto % All
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
                 
@@ -2219,7 +2226,7 @@ export default function T12Analyzer() {
                           {formatCurrency(item.amount)}
                         </div>
                         {item.decision === 'partial' && item.partialPercent && (
-                          <div style={{ color: '#f59e0b', fontSize: '9px' }}>
+                          <div style={{ color: item.category === 'marketing' ? '#60a5fa' : '#f59e0b', fontSize: '9px' }}>
                             {item.partialPercent.toFixed(1)}% → {formatCurrency(item.amount * item.partialPercent / 100)}
                           </div>
                         )}
@@ -2257,21 +2264,29 @@ export default function T12Analyzer() {
                         >
                           ✕
                         </button>
-                        <button
-                          onClick={() => handleItemDecision(item.id, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            border: (item.decision === 'partial' && item.useAutoPercent) ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.3)',
-                            background: (item.decision === 'partial' && item.useAutoPercent) ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
-                            color: '#f59e0b',
-                            fontSize: '9px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          %
-                        </button>
+                        {(() => {
+                          const isAd = item.category === 'marketing';
+                          const accentColor = isAd ? '#60a5fa' : '#f59e0b';
+                          const accentRgba = isAd ? 'rgba(59, 130, 246,' : 'rgba(245, 158, 11,';
+                          const isActive = item.decision === 'partial' && item.useAutoPercent;
+                          return (
+                            <button
+                              onClick={() => handleItemDecision(item.id, 'partial', ssEmployeePercent ?? ssRevenuePercent, true)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                border: isActive ? `2px solid ${accentColor}` : `1px solid ${accentRgba} 0.3)`,
+                                background: isActive ? `${accentRgba} 0.2)` : 'transparent',
+                                color: accentColor,
+                                fontSize: '9px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              %
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
