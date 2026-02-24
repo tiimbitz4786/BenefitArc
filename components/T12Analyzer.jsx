@@ -450,6 +450,7 @@ export default function T12Analyzer() {
   const [totalFirmRevenue, setTotalFirmRevenue] = useState(0); // For calculating SS percentage
   const [ssRevenuePercent, setSsRevenuePercent] = useState(0); // SS as % of total firm revenue
   const [ssEmployeePercent, setSsEmployeePercent] = useState(null); // null = not yet entered
+  const [ssAdPercent, setSsAdPercent] = useState(null); // null = not yet entered
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseError, setParseError] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -1746,8 +1747,11 @@ export default function T12Analyzer() {
   const handleItemDecision = useCallback((itemId, decision, partialPercent = null, useAuto = false) => {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.id === itemId) {
+        const autoPercent = item.category === 'marketing'
+          ? (ssAdPercent ?? ssEmployeePercent ?? ssRevenuePercent)
+          : (ssEmployeePercent ?? ssRevenuePercent);
         const effectivePercent = decision === 'partial'
-          ? (useAuto ? (ssEmployeePercent ?? ssRevenuePercent) : partialPercent)
+          ? (useAuto ? autoPercent : partialPercent)
           : null;
 
         // Save rule for future uploads
@@ -1762,14 +1766,17 @@ export default function T12Analyzer() {
       }
       return item;
     }));
-  }, [ssEmployeePercent, ssRevenuePercent, saveRule]);
+  }, [ssAdPercent, ssEmployeePercent, ssRevenuePercent, saveRule]);
   
   // Handle bulk decision for all items in a section
   const handleSectionDecision = useCallback((sectionPath, decision, partialPercent = null, useAuto = false) => {
     setUncategorizedItems(prev => prev.map(item => {
       if (item.sectionPath === sectionPath) {
+        const autoPercent = item.category === 'marketing'
+          ? (ssAdPercent ?? ssEmployeePercent ?? ssRevenuePercent)
+          : (ssEmployeePercent ?? ssRevenuePercent);
         const effectivePercent = decision === 'partial'
-          ? (useAuto ? (ssEmployeePercent ?? ssRevenuePercent) : partialPercent)
+          ? (useAuto ? autoPercent : partialPercent)
           : null;
 
         // Save rule for each item in the section
@@ -1784,7 +1791,7 @@ export default function T12Analyzer() {
       }
       return item;
     }));
-  }, [ssEmployeePercent, ssRevenuePercent, saveRule]);
+  }, [ssAdPercent, ssEmployeePercent, ssRevenuePercent, saveRule]);
   
   // Group uncategorized items by section path for display
   const groupedUncategorizedItems = useMemo(() => {
@@ -1983,6 +1990,73 @@ export default function T12Analyzer() {
               }}
             >
               Apply to All Items
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Advertising Budget % - shown when there are uncategorized marketing items */}
+      {ssRevenuePercent < 100 && uncategorizedItems.some(item => item.category === 'marketing') && (
+        <div style={{
+          padding: '14px 18px',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+          borderRadius: '12px',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          marginBottom: '20px',
+        }}>
+          <div style={{ fontSize: '12px', color: '#60a5fa', fontWeight: '600', marginBottom: '8px' }}>
+            Advertising Budget Allocation
+          </div>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0', lineHeight: '1.5' }}>
+            What percentage of your firm's advertising budget is dedicated to Social Security?
+            This will be applied to shared advertising expenses (Brand, general marketing, etc.).
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="e.g. 70"
+              value={ssAdPercent ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSsAdPercent(val === '' ? null : Math.min(100, Math.max(0, parseFloat(val) || 0)));
+              }}
+              style={{
+                width: '80px', padding: '8px 12px', borderRadius: '8px',
+                border: '1px solid rgba(59, 130, 246, 0.4)', background: 'rgba(15, 15, 25, 0.8)',
+                color: '#f1f5f9', fontSize: '14px', fontWeight: '600', textAlign: 'center',
+              }}
+            />
+            <span style={{ color: '#94a3b8', fontSize: '14px' }}>%</span>
+            <button
+              onClick={() => {
+                if (ssAdPercent != null && ssAdPercent > 0) {
+                  setUncategorizedItems(prev => prev.map(item => {
+                    if (item.category === 'marketing') {
+                      saveRule(item.description, 'partial', ssAdPercent, item.category);
+                      return {
+                        ...item,
+                        decision: 'partial',
+                        partialPercent: ssAdPercent,
+                        useAutoPercent: true,
+                      };
+                    }
+                    return item;
+                  }));
+                }
+              }}
+              disabled={ssAdPercent == null || ssAdPercent <= 0}
+              style={{
+                padding: '8px 16px', borderRadius: '8px', border: 'none',
+                background: (ssAdPercent != null && ssAdPercent > 0)
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                  : 'rgba(59, 130, 246, 0.2)',
+                color: 'white', fontSize: '12px', fontWeight: '600',
+                cursor: (ssAdPercent != null && ssAdPercent > 0) ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Apply to Ad Items
             </button>
           </div>
         </div>
