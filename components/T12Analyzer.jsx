@@ -950,7 +950,10 @@ export default function T12Analyzer() {
           if (topLevel.startsWith('income') || topLevel.startsWith('revenue')) {
             const isSS = isSSRelated(description) || isSSRelated(leafDesc);
             if (isSS) hasSSIncomeSignal = true;
-            if (isNonSSExpense(description) || isNonSSExpense(leafDesc)) hasNonSSIncomeSignal = true;
+            // Use the broad NON_SS_KEYWORDS list for income signal detection
+            // (the narrow NON_SS_PRACTICE_KEYWORDS misses practice areas like
+            // "litigation", "corporate", "real estate" that clearly indicate non-SS income)
+            if (containsKeyword(description, NON_SS_KEYWORDS) || containsKeyword(leafDesc, NON_SS_KEYWORDS)) hasNonSSIncomeSignal = true;
 
             // SS income is never excluded — SS signal takes priority over generic
             // excluded keywords like "other income" (e.g., "Other Income - SSA EAJA Fees")
