@@ -799,36 +799,20 @@ export default function T12Analyzer() {
         // Skip header row if present (e.g., "Account,Amount")
         const startIdx = parsedLines[0]?.description.toLowerCase().match(/^(account|description|name)$/) ? 1 : 0;
 
-        // ===== PRE-SCAN: Identify parent paths and total/footer lines =====
-        // A "parent path" is a colon-delimited description that also appears
-        // as a prefix of another line (e.g., "Expenses:Marketing" is a parent
-        // if "Expenses:Marketing:Google Ads" exists). Parent amounts are the
-        // sum of their children, so we skip them to avoid double-counting.
-        // A "total line" has a leaf segment matching a footer pattern.
-        const colonAllPaths = new Set();
-        const colonParentPaths = new Set();
+        // ===== PRE-SCAN: Identify total/footer lines =====
+        // A "total line" has a leaf segment matching a footer pattern
+        // (e.g., "Expenses:Marketing:Total Marketing"). These are skipped
+        // during the main loop to avoid counting roll-up lines.
         const colonTotalLines = new Set();
 
         for (let i = startIdx; i < parsedLines.length; i++) {
           const desc = parsedLines[i].description;
           if (!desc.includes(':') || !parsedLines[i].hasAmount) continue;
-          colonAllPaths.add(desc.toLowerCase().trim());
 
           // Check if leaf segment is a total/footer
           const segs = desc.split(':').map(s => s.trim());
           if (getTotalForSection(segs[segs.length - 1]) !== null) {
             colonTotalLines.add(i);
-          }
-        }
-
-        // For each path, check if stripping the last segment yields another
-        // path in the set — if so, that other path is a parent.
-        for (const path of colonAllPaths) {
-          const lastColon = path.lastIndexOf(':');
-          if (lastColon === -1) continue;
-          const parentPath = path.substring(0, lastColon).trim();
-          if (colonAllPaths.has(parentPath)) {
-            colonParentPaths.add(parentPath);
           }
         }
 
@@ -842,9 +826,6 @@ export default function T12Analyzer() {
 
           // Skip total/footer lines (leaf is "Total", "Subtotal", etc.)
           if (colonTotalLines.has(i)) continue;
-
-          // Skip parent lines (their amount is the sum of children)
-          if (colonParentPaths.has(description.toLowerCase().trim())) continue;
 
           const segments = description.split(':').map(s => s.trim());
           const topLevel = segments[0].toLowerCase();
@@ -964,8 +945,9 @@ export default function T12Analyzer() {
       // ===== PRE-SCAN: Identify parent accounts =====
       // Simulate stack nesting to find parent-with-amount lines: a line that
       // has an amount AND a matching "Total for X" closes it later.
-      // These parents are pushed to the section stack for context but their
-      // amounts are NOT counted (children already account for them).
+      // In QuickBooks, parent amounts are the account's OWN balance (not a
+      // roll-up of children), so they are still counted as line items. The
+      // pre-scan lets us push them to the section stack for context.
       const parentWithAmountLines = new Set();
       const parentAccountNames = new Set();
       const preScanStack = [];
@@ -1108,10 +1090,12 @@ export default function T12Analyzer() {
         if (inExpenseSection) {
           if (getTotalForSection(description) !== null) continue;
 
-          // Parent accounts: have an amount BUT also have "Total for X" later.
-          // Push them as section headers so children get proper context.
-          // Their amount is NOT processed — children already account for it.
-          if (hasAmount && description && parentAccountNames.has(description.trim().toLowerCase())) {
+          // Parent accounts: have an amount AND a matching "Total for X" later.
+          // In QuickBooks, a parent's amount is its OWN balance (not the sum of
+          // children), so we must count it as a line item. We also push it to the
+          // section stack so children inherit the right context.
+          if (hasAmount && description &&
+              (parentAccountNames.has(description.trim().toLowerCase()) || parentWithAmountLines.has(i))) {
             sectionStack.push(description);
             currentPath = sectionStack.join(' > ');
             if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) inMarketingParent = true;
@@ -1126,27 +1110,7 @@ export default function T12Analyzer() {
               inNonSSSubsection = true;
               inSSSubsection = false;
             }
-            continue; // Parent amount is the sum of children — skip to avoid double-counting
-          }
-
-          // Parent with amount confirmed by stack-based pre-scan (backup check).
-          // Push to stack for hierarchy context, skip amount to avoid double-counting.
-          if (parentWithAmountLines.has(i) && hasAmount) {
-            sectionStack.push(description);
-            currentPath = sectionStack.join(' > ');
-            if (isSSRelated(description)) {
-              inSSSubsection = true;
-              inNonSSSubsection = false;
-              if (inMarketingParent) ssSubsectionType = 'marketing';
-              else if (inLaborParent) ssSubsectionType = 'labor';
-              else ssSubsectionType = 'expense';
-            } else if (containsKeyword(description, NON_SS_KEYWORDS)) {
-              inNonSSSubsection = true;
-              inSSSubsection = false;
-            }
-            if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) inMarketingParent = true;
-            if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) inLaborParent = true;
-            continue; // Parent amount is the sum of children — skip to avoid double-counting
+            // Fall through to process as line item — parent has its own balance
           }
 
           // Section headers (no amount)
