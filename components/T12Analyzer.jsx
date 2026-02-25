@@ -753,7 +753,18 @@ export default function T12Analyzer() {
           amountStr = '';
         } else {
           description = parts[0].replace(/"/g, '').trim();
-          amountStr = parts[1].replace(/"/g, '').trim();
+          // Find the amount: use the LAST column that looks like a number.
+          // This handles multi-column formats (e.g., Account, Type, Detail, Parent, Amount)
+          // as well as standard 2-column P&L exports.
+          amountStr = '';
+          for (let k = parts.length - 1; k >= 1; k--) {
+            const candidate = parts[k].replace(/"/g, '').trim();
+            // Check if it looks numeric (allows $, commas, parens, minus)
+            if (candidate && /[0-9]/.test(candidate) && /^[\s$(),.\-0-9]+$/.test(candidate)) {
+              amountStr = candidate;
+              break;
+            }
+          }
         }
         
         const cleanAmountStr = amountStr.replace(/[$,\s]/g, '');
@@ -772,6 +783,108 @@ export default function T12Analyzer() {
           isNegative,
           original: line,
         });
+      }
+
+      // ===== CHECK FOR MULTI-COLUMN CHART-OF-ACCOUNTS FORMAT =====
+      // Some exports include columns like "Account Name, Type, Detail Type,
+      // SubAccount Of, Amount". Detect this by checking the header row for a
+      // "type" column containing values like "Income", "Expense", "Cost of Goods Sold".
+      // Re-map into flat P&L structure so existing parsers can handle it.
+      const headerLine = lines[0]?.trim().toLowerCase() || '';
+      const headerParts = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
+      const typeColIdx = headerParts.findIndex(h => h === 'type');
+      const subAccountColIdx = headerParts.findIndex(h => h === 'subaccount of' || h === 'sub-account of' || h === 'parent' || h === 'parent account');
+
+      if (typeColIdx >= 0) {
+        // Multi-column format detected — re-parse with column awareness
+        const reMapLines = [];
+        // Group by type to create proper P&L sections
+        const incomeItems = [];
+        const cogsItems = [];
+        const expenseItems = [];
+        const otherIncomeItems = [];
+        const otherExpenseItems = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          // Parse all CSV fields
+          const fields = [];
+          let cur = '';
+          let inQ = false;
+          for (let j = 0; j < line.length; j++) {
+            const ch = line[j];
+            if (ch === '"') { inQ = !inQ; }
+            else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+            else { cur += ch; }
+          }
+          fields.push(cur.trim());
+
+          const accountName = (fields[0] || '').replace(/"/g, '').trim();
+          const accountType = (fields[typeColIdx] || '').replace(/"/g, '').trim().toLowerCase();
+          const parentAccount = subAccountColIdx >= 0 ? (fields[subAccountColIdx] || '').replace(/"/g, '').trim() : '';
+
+          // Find amount from the last numeric column
+          let amt = '';
+          for (let k = fields.length - 1; k >= 1; k--) {
+            const c = fields[k].replace(/"/g, '').trim();
+            if (c && /[0-9]/.test(c) && /^[\s$(),.\-0-9]+$/.test(c)) {
+              amt = c;
+              break;
+            }
+          }
+
+          if (!accountName) continue;
+
+          // Build a colon-delimited path using Type and Parent for hierarchy
+          let sectionPrefix = '';
+          if (accountType === 'income') sectionPrefix = 'Income';
+          else if (accountType === 'cost of goods sold') sectionPrefix = 'Expenses';
+          else if (accountType === 'expense') sectionPrefix = 'Expenses';
+          else if (accountType === 'other income') sectionPrefix = 'Other Income';
+          else if (accountType === 'other expense') sectionPrefix = 'Other Expense';
+          else continue; // Skip header rows, unknown types
+
+          // Build hierarchical description: Section:Parent:Account
+          let fullDesc;
+          if (parentAccount) {
+            fullDesc = `${sectionPrefix}:${parentAccount}:${accountName}`;
+          } else {
+            fullDesc = `${sectionPrefix}:${accountName}`;
+          }
+
+          // Re-create the line as "Description,Amount" for parsedLines
+          reMapLines.push(`${fullDesc},${amt}`);
+        }
+
+        // Replace parsedLines with re-mapped data and re-parse
+        parsedLines.length = 0;
+        for (let i = 0; i < reMapLines.length; i++) {
+          const line = reMapLines[i];
+          const commaIdx = line.lastIndexOf(',');
+          const description = line.substring(0, commaIdx).trim();
+          const amountStr = line.substring(commaIdx + 1).trim();
+
+          const cleanAmountStr = amountStr.replace(/[$,\s]/g, '');
+          let isNegative = cleanAmountStr.includes('(') || cleanAmountStr.startsWith('-');
+          const numericStr = cleanAmountStr.replace(/[()]/g, '').replace('-', '');
+          const amount = parseFloat(numericStr) || 0;
+          const finalAmount = isNegative ? -amount : amount;
+          const hasAmount = numericStr.length > 0 && !isNaN(parseFloat(numericStr));
+
+          parsedLines.push({
+            lineNum: i,
+            description,
+            amount,
+            finalAmount,
+            hasAmount,
+            isNegative,
+            original: line,
+          });
+        }
+        // The re-mapped data is now in colon-delimited format — fall through
+        // to the colon-format detection below which will handle it.
       }
 
       // ===== CHECK FOR COLON-DELIMITED HIERARCHICAL FORMAT =====
