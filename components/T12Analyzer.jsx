@@ -62,6 +62,14 @@ const SS_KEYWORDS = [
   'ssa', 'social security administration',
   'odar', 'oho', 'office of hearings',
   'dds', 'disability determination',
+  // SS-specific organizations & roles
+  'nosscr', 'nadr',
+  'non-attorney rep', 'non-attorney representative', 'non-attorney representatives',
+  'claimant', 'claimants',
+  // SS-specific financial terms
+  'backpay', 'back pay', 'past due benefits',
+  // SS-adjacent experts
+  'vocational expert',
 ];
 
 // Keywords that indicate OTHER practice areas - NOT Social Security (EXCLUDE)
@@ -421,15 +429,90 @@ const isNonSSExpense = (text) => {
   return containsKeyword(text, NON_SS_PRACTICE_KEYWORDS);
 };
 
-// Helper: Check if text is a "Total for X" line and extract section name
+// Section-path keywords that indicate shared firm overhead/infrastructure.
+// Items under these sections auto-include because they support ALL practice areas.
+// NOT included: marketing/advertising (practice-specific), COGS/case costs (case-specific).
+const OVERHEAD_SECTION_KEYWORDS = [
+  // Payroll / Staff costs
+  'payroll', 'wages', 'wage', 'salary', 'salaries', 'labor', 'labour',
+  'compensation', 'staff', 'personnel', 'benefits', 'bonus', 'bonuses',
+  // Facilities
+  'occupancy', 'rent', 'facilities', 'office space',
+  'common area', 'cam', 'storage', 'cleaning', 'janitorial',
+  'parking',
+  // Utilities
+  'utilities', 'utility', 'telecom', 'telecommunications',
+  'electric', 'gas', 'water', 'internet', 'phone', 'telephone',
+  // Technology & IT
+  'software', 'subscriptions', 'subscription',
+  'it', 'information technology', 'managed services',
+  'equipment', 'hardware', 'technology',
+  'computer', 'computers', 'computer costs', 'computer expense',
+  'repairs', 'repair', 'maintenance',
+  'copier', 'scanner', 'printer',
+  'security', 'cyber', 'cyber security', 'cybersecurity',
+  // Insurance (firm-level)
+  'insurance', 'liability',
+  // Professional services & dues
+  'professional fees', 'accounting', 'tax prep', 'bookkeeping',
+  'bar dues', 'licensing', 'cle', 'training',
+  'memberships', 'dues', 'membership',
+  'education', 'continuing education',
+  'consulting',
+  // Office operations
+  'office operations', 'office supplies', 'supplies',
+  'office expense', 'office expenses', 'office cost', 'office costs',
+  'printing', 'copying', 'postage', 'shipping',
+  'bank service', 'bank charges', 'bank fees',
+  'merchant', 'payment processing',
+  'dining', 'gifts', 'donations', 'charitable',
+  // Travel & meals
+  'travel', 'meals', 'conferences', 'entertainment',
+  // Taxes & licenses
+  'taxes', 'licenses', 'permits', 'franchise',
+  // Vehicles
+  'auto', 'automobile', 'vehicle',
+  // Depreciation
+  'depreciation', 'amortization',
+  // General catch-all sections
+  'miscellaneous', 'misc',
+  'general & administrative', 'g&a', 'general and administrative',
+  'administrative',
+];
+
+// Helper: Check if section path segments indicate shared overhead
+const isOverheadSection = (pathSegments) => {
+  return pathSegments.some(s => containsKeyword(s, OVERHEAD_SECTION_KEYWORDS));
+};
+
+// Helper: Check if text is a "Total for X" line and extract section name.
+// Returns the section name (string) if recognized, '' for bare totals, null otherwise.
 const getTotalForSection = (text) => {
-  const lower = text.toLowerCase();
-  if (lower.startsWith('total for ')) {
-    return text.substring(10).trim();
-  }
-  if (lower.startsWith('total ') && !lower.includes('total revenue') && !lower.includes('total income')) {
+  const lower = text.toLowerCase().trim();
+
+  // "Total for X" — most common QuickBooks footer
+  if (lower.startsWith('total for ')) return text.substring(10).trim();
+
+  // "Subtotal for X" / "Sub-total for X"
+  if (lower.startsWith('subtotal for ')) return text.substring(13).trim();
+  if (lower.startsWith('sub-total for ')) return text.substring(14).trim();
+
+  // "Subtotal X" / "Sub-total X" (without "for")
+  if (lower.startsWith('subtotal ')) return text.substring(9).trim();
+  if (lower.startsWith('sub-total ')) return text.substring(10).trim();
+
+  // "Total X" — but NOT document-structure roll-ups
+  const TOTAL_STOPWORDS = [
+    'total revenue', 'total income', 'total expenses', 'total expense',
+    'total operating expenses', 'total cost of goods sold', 'total cogs',
+  ];
+  if (lower.startsWith('total ') && !TOTAL_STOPWORDS.includes(lower)) {
     return text.substring(6).trim();
   }
+
+  // Bare "Total" or "Total:" — recognized as footer, returns empty string
+  if (lower === 'total' || lower === 'total:') return '';
+
   return null;
 };
 
@@ -692,17 +775,76 @@ export default function T12Analyzer() {
       }
 
       // ===== CHECK FOR COLON-DELIMITED HIERARCHICAL FORMAT =====
+      // A true colon-delimited P&L encodes hierarchy in each line, e.g.
+      // "Expenses:Marketing:Google Ads, 5000". We detect this by checking
+      // whether the text BEFORE the first colon is a known top-level P&L
+      // section. This avoids false positives from flat-format files that
+      // happen to use colons in account names (e.g. "Insurance: Health").
+      const KNOWN_PL_SECTIONS = [
+        'income', 'revenue',
+        'expenses', 'expense', 'operating expenses',
+        'cost of goods sold', 'cogs',
+        'other income', 'other expense', 'other expenses',
+      ];
       const linesWithAmounts = parsedLines.filter(l => l.hasAmount);
-      const colonLines = linesWithAmounts.filter(l => l.description.includes(':'));
-      const isColonFormat = linesWithAmounts.length > 0 && (colonLines.length / linesWithAmounts.length) > 0.5;
+      const colonHierarchyLines = linesWithAmounts.filter(l => {
+        if (!l.description.includes(':')) return false;
+        const firstSegment = l.description.split(':')[0].trim().toLowerCase();
+        return KNOWN_PL_SECTIONS.includes(firstSegment);
+      });
+      const isColonFormat = linesWithAmounts.length > 0 && colonHierarchyLines.length > 0
+        && (colonHierarchyLines.length / linesWithAmounts.length) > 0.5;
 
       if (isColonFormat) {
         // Skip header row if present (e.g., "Account,Amount")
         const startIdx = parsedLines[0]?.description.toLowerCase().match(/^(account|description|name)$/) ? 1 : 0;
 
+        // ===== PRE-SCAN: Identify parent paths and total/footer lines =====
+        // A "parent path" is a colon-delimited description that also appears
+        // as a prefix of another line (e.g., "Expenses:Marketing" is a parent
+        // if "Expenses:Marketing:Google Ads" exists). Parent amounts are the
+        // sum of their children, so we skip them to avoid double-counting.
+        // A "total line" has a leaf segment matching a footer pattern.
+        const colonAllPaths = new Set();
+        const colonParentPaths = new Set();
+        const colonTotalLines = new Set();
+
+        for (let i = startIdx; i < parsedLines.length; i++) {
+          const desc = parsedLines[i].description;
+          if (!desc.includes(':') || !parsedLines[i].hasAmount) continue;
+          colonAllPaths.add(desc.toLowerCase().trim());
+
+          // Check if leaf segment is a total/footer
+          const segs = desc.split(':').map(s => s.trim());
+          if (getTotalForSection(segs[segs.length - 1]) !== null) {
+            colonTotalLines.add(i);
+          }
+        }
+
+        // For each path, check if stripping the last segment yields another
+        // path in the set — if so, that other path is a parent.
+        for (const path of colonAllPaths) {
+          const lastColon = path.lastIndexOf(':');
+          if (lastColon === -1) continue;
+          const parentPath = path.substring(0, lastColon).trim();
+          if (colonAllPaths.has(parentPath)) {
+            colonParentPaths.add(parentPath);
+          }
+        }
+
+        // Track whether income lines signal a specific practice area
+        let hasSSIncomeSignal = false;
+        let hasNonSSIncomeSignal = false;
+
         for (let i = startIdx; i < parsedLines.length; i++) {
           const { description, amount, finalAmount, hasAmount } = parsedLines[i];
           if (!hasAmount || amount === 0) continue;
+
+          // Skip total/footer lines (leaf is "Total", "Subtotal", etc.)
+          if (colonTotalLines.has(i)) continue;
+
+          // Skip parent lines (their amount is the sum of children)
+          if (colonParentPaths.has(description.toLowerCase().trim())) continue;
 
           const segments = description.split(':').map(s => s.trim());
           const topLevel = segments[0].toLowerCase();
@@ -712,14 +854,20 @@ export default function T12Analyzer() {
 
           // ===== INCOME =====
           if (topLevel.startsWith('income') || topLevel.startsWith('revenue')) {
-            if (containsKeyword(description, EXCLUDED_REVENUE_KEYWORDS)) {
+            const isSS = isSSRelated(description) || isSSRelated(leafDesc);
+            if (isSS) hasSSIncomeSignal = true;
+            if (isNonSSExpense(description) || isNonSSExpense(leafDesc)) hasNonSSIncomeSignal = true;
+
+            // SS income is never excluded — SS signal takes priority over generic
+            // excluded keywords like "other income" (e.g., "Other Income - SSA EAJA Fees")
+            if (!isSS && containsKeyword(description, EXCLUDED_REVENUE_KEYWORDS)) {
               excludedRevenue += absAmount;
             } else if (finalAmount < 0) {
               // Contra-income (refunds, write-offs) - reduce firm revenue
               firmRevenue -= absAmount;
             } else {
               firmRevenue += amount;
-              if (isSSRelated(description) || isSSRelated(leafDesc)) {
+              if (isSS) {
                 ssRevenue += amount;
               }
             }
@@ -796,29 +944,41 @@ export default function T12Analyzer() {
               ssItems.push(item);
             } else if (isNonSSExpense(fullPath)) {
               // Path contains non-SS practice keywords → auto-exclude
+            } else if (isOverheadSection(segments.slice(0, -1)) || containsKeyword(leafDesc, OVERHEAD_SECTION_KEYWORDS)) {
+              // Section path or item description indicates shared overhead → auto-include
+              ssItems.push(item);
             } else {
-              // No SS signal → uncategorized, user decides
+              // No signal (e.g., COGS, marketing without practice label) → user decides
               uncategorized.push(item);
             }
           }
         }
-      } else {
-      // ===== EXISTING SECOND PASS (section-state-machine) =====
 
-      // Pre-scan: identify parent-with-amount lines by simulating stack nesting.
-      // A line is a "parent with amount" if it has an amount AND a matching
-      // "Total for X" closes it later (e.g., "Admin,$752K" ... "Total for Admin").
+        // Pure SS inference: if some income has SS keywords and NONE has non-SS
+        // practice keywords, all revenue is SS. Neutral items like "Case Cost
+        // Reimbursements" are obviously SS when there's zero non-SS signal.
+        if (hasSSIncomeSignal && !hasNonSSIncomeSignal && ssRevenue < firmRevenue) {
+          ssRevenue = firmRevenue;
+        }
+      } else {
+      // ===== PRE-SCAN: Identify parent accounts =====
+      // Simulate stack nesting to find parent-with-amount lines: a line that
+      // has an amount AND a matching "Total for X" closes it later.
+      // These parents are pushed to the section stack for context but their
+      // amounts are NOT counted (children already account for them).
       const parentWithAmountLines = new Set();
+      const parentAccountNames = new Set();
       const preScanStack = [];
 
       for (let i = 0; i < parsedLines.length; i++) {
         const { description, hasAmount } = parsedLines[i];
         if (!description) continue;
         const lowerDesc = description.toLowerCase().trim();
-        if (lowerDesc.startsWith('total')) {
-          const totalFor = getTotalForSection(description);
-          if (totalFor) {
-            const closingName = totalFor.trim().toLowerCase();
+        const totalFor = getTotalForSection(description);
+        if (totalFor !== null) {
+          const closingName = totalFor.trim().toLowerCase();
+          if (closingName) {
+            parentAccountNames.add(closingName);
             for (let j = preScanStack.length - 1; j >= 0; j--) {
               if (preScanStack[j].name === closingName) {
                 if (preScanStack[j].hasAmount) {
@@ -835,6 +995,7 @@ export default function T12Analyzer() {
         preScanStack.push({ name: lowerDesc, lineIndex: i, hasAmount });
       }
 
+      // ===== SECOND PASS (section-state-machine) =====
       // Second pass: analyze and categorize
       for (let i = 0; i < parsedLines.length; i++) {
         const { description, amount, finalAmount, hasAmount, isNegative } = parsedLines[i];
@@ -918,6 +1079,9 @@ export default function T12Analyzer() {
           }
           // If no exact match, this "Total for X" is a subtotal for line items, not a section closer
 
+          // Update currentPath to reflect popped sections (prevents stale paths)
+          currentPath = sectionStack.join(' > ');
+
           // Re-evaluate ALL context based on remaining stack
           inMarketingParent = sectionStack.some(s => containsKeyword(s, MARKETING_SECTION_KEYWORDS));
           inLaborParent = sectionStack.some(s => containsKeyword(s, LABOR_SECTION_KEYWORDS));
@@ -942,17 +1106,16 @@ export default function T12Analyzer() {
 
         // ===== EXPENSE SECTION =====
         if (inExpenseSection) {
-          if (lowerDesc.startsWith('total')) continue;
+          if (getTotalForSection(description) !== null) continue;
 
-          // Parent category with direct amount (e.g., "Admin $752K" with "Total for Admin" later)
-          const isParentWithAmount = parentWithAmountLines.has(i);
-
-          if (isParentWithAmount && hasAmount) {
-            // Push to stack for hierarchy
+          // Parent accounts: have an amount BUT also have "Total for X" later.
+          // Push them as section headers so children get proper context.
+          // Their amount is NOT processed — children already account for it.
+          if (hasAmount && description && parentAccountNames.has(description.trim().toLowerCase())) {
             sectionStack.push(description);
             currentPath = sectionStack.join(' > ');
-
-            // Update SS/non-SS context (affects practice area classification)
+            if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) inMarketingParent = true;
+            if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) inLaborParent = true;
             if (isSSRelated(description)) {
               inSSSubsection = true;
               inNonSSSubsection = false;
@@ -963,17 +1126,27 @@ export default function T12Analyzer() {
               inNonSSSubsection = true;
               inSSSubsection = false;
             }
+            continue; // Parent amount is the sum of children — skip to avoid double-counting
+          }
 
-            // Allow marketing context even inside labor (marketing employees' costs
-            // should use ad % allocation). Labor context inside marketing is also allowed.
-            if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) {
-              inMarketingParent = true;
+          // Parent with amount confirmed by stack-based pre-scan (backup check).
+          // Push to stack for hierarchy context, skip amount to avoid double-counting.
+          if (parentWithAmountLines.has(i) && hasAmount) {
+            sectionStack.push(description);
+            currentPath = sectionStack.join(' > ');
+            if (isSSRelated(description)) {
+              inSSSubsection = true;
+              inNonSSSubsection = false;
+              if (inMarketingParent) ssSubsectionType = 'marketing';
+              else if (inLaborParent) ssSubsectionType = 'labor';
+              else ssSubsectionType = 'expense';
+            } else if (containsKeyword(description, NON_SS_KEYWORDS)) {
+              inNonSSSubsection = true;
+              inSSSubsection = false;
             }
-            if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) {
-              inLaborParent = true;
-            }
-
-            // Fall through to line-item creation below (don't continue)
+            if (containsKeyword(description, MARKETING_SECTION_KEYWORDS)) inMarketingParent = true;
+            if (containsKeyword(description, LABOR_SECTION_KEYWORDS)) inLaborParent = true;
+            continue; // Parent amount is the sum of children — skip to avoid double-counting
           }
 
           // Section headers (no amount)
@@ -1094,9 +1267,11 @@ export default function T12Analyzer() {
               ssItems.push(item);
             } else if (isNonSSExpense(description)) {
               // Line-item description contains non-SS practice keywords → auto-exclude
+            } else if (isOverheadSection(sectionStack) || containsKeyword(description, OVERHEAD_SECTION_KEYWORDS)) {
+              // Section path or item description indicates shared overhead → auto-include
+              ssItems.push(item);
             } else {
-              // No practice-area signal → uncategorized, user decides
-              console.log('[T12 DEBUG] Uncategorized item:', description, '| category:', category, '| path:', currentPath, '| inMktParent:', inMarketingParent);
+              // No signal (e.g., COGS, marketing without practice label) → user decides
               uncategorized.push(item);
             }
           }
